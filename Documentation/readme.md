@@ -13,20 +13,26 @@ though data (such as publicly available FIA, or DAYMET data) is not included due
 to contributor priority.
  
  List of Scripts: 
- 1.1 Calculate_Forest_Mortality.R (Html output included):
-               This script is used to calculate the FIA conditions for initiating the model and for mortality comparison. This model subsets the FIA data to latitude and elevation parameters for each model within the study area. It then calculates the percentage of mortality observed during each year. It calculates the initial conditions of the model from the mean observed ponderosa pine density for the years of 2005-2006. It then applies that percentage of mortality to the initial density for each area for each time step. This results in a .csv that was used the MCMC processes and analysis.
- 1.2 Comparing_Drought_Drivers.R (Html output included):
+ > 1.1 Calculate_Forest_Mortality.R (Html output included):
+ > This script is used to calculate the FIA conditions for initiating the model and for mortality comparison. This model subsets the FIA data to latitude and elevation parameters for each model within the study area. It then calculates the percentage of mortality observed during each year. It calculates the initial conditions of the model from the mean observed ponderosa pine density for the years of 2005-2006. It then applies that percentage of mortality to the initial density for each area for each time step. This results in a .csv that was used the MCMC processes and analysis.
+
+>1.2 Comparing_Drought_Drivers.R (Html output included):
                This script calculates the Precipitation -Evapotranspiration, Standard Precipitation Index, and Palmers Drought Severity Index derived drought drivers for the TDIA model that could be used within the model for the four sites we modeled. It also compares those drivers to the mortality experienced by the trees for each year and calculates an R2. 
- 1.3 Median_Insect_Growth.IPYNB (Html output included):
-               This script uses the python package Pymc3 to fit the growth curve required for each stage of insect development from published rates of development in relation to temperature. It fits each growth curve using a Hamiltonian sampler. Graphs are produced for the runs and the resulting curves. 
- 1.4 Historical_Climate_WPB.RMD (Html output included):
+
+>1.3 Median_Insect_Growth.IPYNB (Html output included):
+This script uses the python package Pymc3 to fit the growth curve required for each stage of insect development from published rates of development in relation to temperature. It fits each growth curve using a Hamiltonian sampler. Graphs are produced for the runs and the resulting curves. 
+
+>1.4 Historical_Climate_WPB.RMD (Html output included):
  	This script calculates a minimum and maximum temperature vector for the IMAP/TDIA model that reflects the difference in monthly means between the two time periods analyzed. To do this we will first compare the PRISM monthly historic means, with the monthly means from the observed temperatures used to run the model for each of the four sites. Then we will use the monthly difference to calculate a new daily driver that removes this difference, thus creating the historic.1.5 WPB_Submission.F90 
- 1.5 WPB_Submission.F90:
+
+> 1.5 WPB_Submission.F90:
                The FORTRAN code to implement the IMAP/TDIA. This includes the insect growth and population model (IMAP) and the tree attack model (TDIA) and implements them together with climate drivers and produces the number of trees killed at each time step, as well as insect populations at each development stage. Included in this FORTRAN code are basic instructions as to how to implement FORTRAN code in python using the f2py module. This code can be run on a variety of FORTRAN implementation platforms, however, for our research, we primarily wrapped the FORTRAN code as a python package. This often has to be done unique to a given Python version and setup, so instructions and some links are included as to how to implement this. 
-1.6 WPB_Test_Sub.cp36-win_amd64:
+
+> 1.6 WPB_Test_Sub.cp36-win_amd64:
                An f2py wrapper for python 3.6 on windows using mgwin64 bit. This can be implemented on certain python 3.6 builds on windows, by calling import WPB_Test_Sub. The file must be in the same location as the script calling it. If you cannot implement this read the WPB_submission.F90 instructions as to how to build a python wrapper for the FORTRAN code for your given python build.
   1.6 Single-Model-MCMC.py:
                 This code was built to run an MCMC sampler for 4 the IMAP/TDIA models in parallel. It was used to do the parameterization of the attack model to the field data. It runs a single MCMC parameterization with 4 parallel model runs (4 sites) for both a current and proposed move. It also serves as an example of how to implement the IMAP/TDIA in python. 
- 1.7 Multi-Model-MCMC.py:
+
+> 1.7 Multi-Model-MCMC.py:
  	This code was built to run an MCMC sampler for 4 of the IMAP/TDIA models in parallel. It was used to do the validation runs (removing one site from each parameterization). It runs four MCMC parameterizations independent and parallel, using a multivariate_normal distribution.
 
