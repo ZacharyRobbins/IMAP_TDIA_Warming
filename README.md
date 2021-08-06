@@ -9,14 +9,14 @@ This is the erespository for the Western Pine Beetle IMAP_TDIA work, used in the
 * Brian H. Aukema *University of Minnesota* 
 * Polly C. Buotte *Lawrence Berkeley National Laboratory* 
 * Rutuja Chitra-Tarak *Los Alamos National Laboratory*
-* Christopher J Fettig *U.S. Forest Service, Pacific Southwest Research Station *
-* Michael L. Goulden *University of California, Irvine *
-* Devin W. Goodsman *Canadian Forest Service *
+* Christopher J Fettig *U.S. Forest Service, Pacific Southwest Research Station*
+* Michael L. Goulden *University of California, Irvine*
+* Devin W. Goodsman *Canadian Forest Service*
 * Alexander D. Hall *University of California Los Angeles*
-* Charles D. Koven *Lawrence Berkeley National Laboratory *
-* Lara M Kueppers  *Lawrence Berkeley National Laboratory *
+* Charles D. Koven *Lawrence Berkeley National Laboratory*
+* Lara M Kueppers  *Lawrence Berkeley National Laboratory*
 * Gavin D Madakumbura *University of California Los Angeles*
-* Leif A. Mortenson *U.S. Forest Service, Pacific Southwest Research Station *
+* Leif A. Mortenson *U.S. Forest Service, Pacific Southwest Research Station*
 * James A Powell *Utah State University *
 * Robert M. Scheller *North Carolina State University* 
 
