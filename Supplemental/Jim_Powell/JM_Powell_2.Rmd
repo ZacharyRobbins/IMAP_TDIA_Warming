@@ -1,0 +1,76 @@
+---
+title: "Untitled"
+author: "Zjrobbin"
+date: "2/17/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+Flight=c(0,0,0,.0001,.0001,.0002,.0005,.007,.001,.038,.05,.02,.06,.02,
+       .05,.05,.1,.05,.08,.1,.03,.1,.08,.03,.02,.04,.03,.02,.019,.0005,.0004,0,0,0,0,0)
+
+Flight_scaled<-Flight*10*.33
+temps<-seq(10,45,1)
+
+FlightData<-cbind(Flight_scaled,temps)
+
+```
+
+
+
+```{r}
+fitfun<-function(x,a,b,c,d){
+ y=ifelse(x <18,0,ifelse(x< 39,y=a+x*b+(c*x**2),0))
+ y[y<0]<-0
+ return(y)
+} 
+
+fit2 <- nls(Flight_scaled~fitfun(temps,a,b,c),
+            start = list(a= .1, b = 0.01,c=.001))
+        
+summary(fit2)
+plot(temps,as.numeric(Flight_scaled),pch=19,col=adjustcolor("red",alpha.f = .5))
+points(temps,predict(fit2,type="response"))
+AIC(fit2)
+```
+
+
+```{r}
+fitfun<-function(x,a,b,c,d){
+ y=ifelse(x <18,0,ifelse(x< 39,y=a+x*b+(c*x**2)+(d*x**3),0))
+ y[y<0]<-0
+ return(y)
+} 
+
+fit3 <- nls(Flight_scaled~fitfun(temps,a,b,c,d),
+            start = list(a= .1, b = 0.01,c=.001,d=.0001))
+        
+summary(fit3)
+plot(temps,as.numeric(Flight_scaled),pch=19,col=adjustcolor("red",alpha.f = .5))
+points(temps,predict(fit3,type="response"))
+AIC(fit3)
+```
+
+
+```{r}
+fitfun<-function(x,a,b,c,d,e){
+ y=ifelse(x <18,0,ifelse(x< 39,y=a+x*b+(c*x**2)+(d*x**3)+(e*x**4),0))
+ y[y<0]<-0
+ return(y)
+} 
+
+fit4 <- nls(Flight_scaled~fitfun(temps,a,b,c,d,e),
+            start = list(a= .1, b = 0.01,c=.001,d=.0001,e=.00001))
+        
+summary(fit4)
+plot(temps,as.numeric(Flight_scaled),pch=19,col=adjustcolor("red",alpha.f = .5))
+points(temps,predict(fit4,type="response"))
+AIC(fit4)
+```
+
+

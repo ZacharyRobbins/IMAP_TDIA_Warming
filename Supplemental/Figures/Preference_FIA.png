@@ -1,0 +1,754 @@
+---
+title: "R Notebook"
+output:
+  html_document:
+    df_print: paged
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F)
+```
+
+
+
+Revisiting Mortality 
+
+```{r}
+library(sf)
+library(rgdal)
+library(plyr)
+library(raster)
+library(RColorBrewer)
+library(dplyr)
+options(scipen = 1e8)
+Dark2<-brewer.pal(8,'Dark2')
+ff<-function(x){
+  return(as.numeric(as.character(x)))
+}
+Pal_1<-brewer.pal(9,"Set3")
+
+'%!in%' <- function(x,y)!('%in%'(x,y))
+
+dft<-function(x){as.data.frame(table(x))}
+```
+
+### Getting the Plots Nessecary 
+```{r}
+
+###Check for points per raster
+Drive<-'C:/Users/zacha/Documents/GitHub/IMAP_Python_Project/'
+###Prepare Tree File
+Years<-seq(2003,2018)
+
+CA_Tree<-read.csv(paste0(Drive,'Inputs/CA_TREE.csv'))
+CA_Tree<-CA_Tree[CA_Tree$INVYR %in% Years,]
+
+##Set projection for project 
+proj<-("+init=epsg:4326 +proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0")
+
+### Data Location 
+FIA_Dir<-paste0(Drive,'Input_Data_Scripts/')
+##FIA_Plot location 
+CA_Plot<-read.csv(paste0(Drive,'Inputs/CA_PLOT.csv'))
+###Remove data without geolocation 
+CA_Plot<-CA_Plot[!is.na(CA_Plot$LAT),]
+CA_Plot<-CA_Plot[!is.na(CA_Plot$LON),]
+
+###StudyArea to clip to 
+SNV_Outline<-readOGR(paste0(Drive,"Inputs/StudyArea/New_Study_Area.shp"))
+# #To LAT:LONG
+SNV_Outline<-spTransform(SNV_Outline,crs(proj))
+
+#length(unique(CA_Plot$CN))
+LL_Points<-cbind(CA_Plot['LON'],CA_Plot['LAT'])
+LL_Points<-na.omit(LL_Points)
+
+### Make into spatial points
+sp_LL<-sp::SpatialPoints(LL_Points,proj4string = CRS(proj))
+
+## Create the plots as a shape 
+DT_sf = sf::st_as_sf(CA_Plot, coords = c("LON", "LAT"), 
+                     crs = 4326, agr='constant')
+#Do the Intesection
+Plots_In_AOI<-sf::st_intersection(sf::st_as_sf(DT_sf),sf::st_as_sf(SNV_Outline))
+### Get cordinates back
+XYS<-st_coordinates(Plots_In_AOI)
+
+###Check out geospatial locations
+par(mar=c(5,5,5,5))
+plot(sf::st_geometry(sf::st_as_sf(SNV_Outline)),axes=TRUE)
+plot(sf::st_geometry(Plots_In_AOI),cex=.1,add=TRUE,axes=TRUE)
+
+###Number of plots is 3505
+
+
+
+### Find  the plots in that are in the area.  Remains at 3504 
+Plots<-as.data.frame(CA_Plot[CA_Plot$CN %in% Plots_In_AOI$CN,])
+
+### Get the elevation from each plot in meters
+Plots$ELEV_m<-Plots$ELEV*.3408
+
+```
+
+
+
+```{r}
+#### This function subsets the dataset by the nessecary lat/elevation and sorts out 
+#### unnessary species 
+
+SortPlots<-function(one,Sp){
+  ### Get the plots in the bounds 
+  PltsSorted<-Plots[Plots$ELEV_m>one$LowEl & Plots$ELEV_m<one$HighEl,]
+  PltsSorted<-PltsSorted[PltsSorted$LAT>one$LatLow & PltsSorted$LAT<one$LatHigh,]
+  ### Subset the database by the plots 
+  Subset<-CA_Tree %>%
+    ### Get just one plot
+    subset(CA_Tree$PLT_CN %in% PltsSorted$CN)%>%  # %>%
+    ## Subset to just species of intrest (for now).
+    subset(SPCD %in% Sp) %>%
+    # ### Get Ht in M
+    mutate(DIA_cm= (DIA*2.54))
+  ###Get the nessecary columns
+  Subset<-Subset[,c("PLT_CN","INVYR","SPCD","DIA_cm","MORTYR","AGENTCD","TPA_UNADJ")]
+  hist(Subset$INVYR)
+  UPY<-Subset %>%
+    ##Group together by the inventory year and the plot number
+    group_by(INVYR,PLT_CN)%>%
+    ## For each plot number summarize the sum and entires for TPA_UNADJ
+    ## This is the total count of stems on the site
+    summarise_at(vars("TPA_UNADJ"),list(sum=sum,length=length))
+  ### Remove entires with 0 TPA 
+  HasTrees<-UPY[!is.na(UPY$sum),]
+  ### Resubset by the plots that have trees 
+  Relevent_Plots<-Subset[Subset$PLT_CN %in% HasTrees$PLT_CN,]
+  return(Subset)
+}
+
+
+#### This calculates the initial population for each study site
+CalculateTrees<-function(Subset){
+
+  Subset<-Subset[Subset$INVYR%in%c(2005,2006),]
+  All<-Subset[Subset$DIA_cm>10.0,]
+
+  Lrg<-Subset[Subset$DIA_cm>31.8,]
+  Smll<-Subset[Subset$DIA_cm< 31.8 & Subset$DIA_cm>10.0,]
+  ### Get the years 2005,2006
+  ### From this summarise the TPA_UNADJ 
+  TPA_All<-All %>%
+    group_by(INVYR,PLT_CN)%>%
+    summarise_at(vars("TPA_UNADJ"),list(sum=sum))
+  TotalPlots<-length(unique(TPA_All$PLT_CN))
+  ###Take the mean and scale form Acre to HA. 
+  TPA_Lrg<-Lrg %>%
+    group_by(INVYR,PLT_CN)%>%
+    summarise_at(vars("TPA_UNADJ"),list(sum=sum))
+  TPA_Smll<-Smll %>%
+    group_by(INVYR,PLT_CN)%>%
+    summarise_at(vars("TPA_UNADJ"),list(sum=sum))
+  
+  (TPA_AllA<-(sum(TPA_All[,3],na.rm = T)*2.47105)/TotalPlots)
+  (TPA_LrgA<-(sum(TPA_Lrg[,3],na.rm = T)*2.47105)/TotalPlots)
+  (TPA_SmallA<-(sum(TPA_Smll[,3],na.rm = T)*2.47105)/TotalPlots)
+  #(length(unique(TPA_1$PLT_CN))))
+  ### Return results. 
+  return(list(TPA_AllA,TPA_LrgA,TPA_SmallA))}
+
+
+
+
+Cal_Mort<-function(Subset){
+  Relevent_Plots<-Subset
+  ### Remove plots that have any of the agent codes for fire, or harvest, vegetation, or unkown. 
+  
+  
+  
+  Relevent_Plots$MORTYR[Relevent_Plots$AGENTCD %in% c(30,40,60,70,80)]<-NA
+  ### Summarize the given mortality year by the tpa_Unadj totaling the number of trees
+  MORTYR<-Relevent_Plots %>%
+    group_by(year=MORTYR)%>% 
+    dplyr::summarise(n=sum(TPA_UNADJ))
+  ### Subtract one year for attack year 
+  MORTYR$year<-MORTYR$year-1
+  ### Get the total trees surveyed in each year
+  ALLYR<-Relevent_Plots %>%
+    group_by(year=INVYR)%>% 
+    dplyr::summarise(n=sum(TPA_UNADJ))
+  ### Get the mean 
+  ALLYR$mean=mean(ALLYR$n,na.rm=T)
+  #ALLYR$Sum=sum(ALLYR$n)
+  MortalityTable<-merge(MORTYR,ALLYR,by='year',all.y=T)
+  MortalityTable[is.na(MortalityTable)]<-0
+  ### Calculate mortality as the number of trees died / trees survyed + Trees died 
+  MortalityTable$per<-MortalityTable$n.x/(MortalityTable$mean+MortalityTable$n.x)#(MortalityTable$n.y+MortalityTable$n.x)
+  return(MortalityTable)
+}
+
+```
+
+
+
+
+### Setting up the analysis
+
+
+```{r}
+Sp=122
+
+#PltsLUT<-data.frame(Name=c("UpperLow","UpperMed","UpperHigh","LowerLow","LowerMed","LowerHigh"),
+#                    Patch=c(1,2,3,4,5,6),
+#                   LowEl=c(400,914,1374, 400,914,1374),
+#                    HighEl=c(1400,1371,1829,1400,1371,1829),
+#                    LatLow=c(37.5,37.5,37.5,33,33,33),
+#                    LatHigh=c(40,40,40,37.5,37.5,37.5))
+PltsLUT<-data.frame(Name=c("UpperLow","UpperMed","HighLatitude","LowerLow","LowerMed","LowLatitude"),
+                    Patch=c(1,2,3,4,5,6),
+                    LowEl=c(400,1400,400, 400,1500,400),
+                    HighEl=c(1400,2000,2000,1500,2200,2200),
+                    LatLow=c(37.5,37.5,37.5,33,33,33),
+                    LatHigh=c(40,40,40,37.5,37.5,37.5))
+```
+
+### Look at the overview
+
+#### All Plots 
+
+##### Number of plots in High Latitude
+```{r}
+###All plots
+#PltsLUT[5,1]
+Subset_North<-SortPlots(PltsLUT[3,],Sp)
+
+
+
+```
+
+### Number of plots in Low Latitude
+```{r}
+Subset_South<-SortPlots(PltsLUT[6,],Sp)
+```
+
+```{r}
+
+Subset_All<-rbind(Subset_North,Subset_South)
+OutTrees<-CalculateTrees(Subset_All)
+print(OutTrees[[1]])
+print(OutTrees[[2]])
+print(OutTrees[[3]])
+
+All<-Subset_All[ Subset_All$DIA_cm>10.0,]
+All<-All[!is.na(All$PLT_CN),]
+AllSub<-All[All$INVYR %in% c(2005,2006),]
+Mort<-Cal_Mort(All)
+barplot(Mort[[5]]*100,names.arg=Mort[[1]],main="Percent Mortality Western Pine Beetle >10. cm",
+        ylab="Percent of Mortality",cex.main=1.5,cex.lab=1.2,cex.axis=1.2)
+sum(Mort$per)
+```
+
+### Comparing to Fettig 
+
+
+```{r}
+Drive<-'C:/Users/zacha/Documents/GitHub/IMAP_Python_Project/'
+FettigData<-read.csv(paste0(Drive,'Inputs/Fettig_Data_Plots.csv'))
+
+Pipo<-FettigData[FettigData$Species=="PIPO",]
+Pipo<-Pipo[Pipo$DBH..cm.>10.0,]
+nrow(Pipo[Pipo$DBH..cm.>31.6,])
+nrow(Pipo[Pipo$DBH..cm.<31.6,])
+
+Dead<-Pipo[Pipo$Live.dead=="D",]
+unique(Dead$BB.Cause)
+
+WPBs=c("WPB","WPB/MPB","WPB/WIND","WBP","WPB ","WPB/MPB ","WPB/RTB")
+WPBKilled<-Dead[Dead$BB.Cause %in% WPBs,]
+LrgDeadYear<-table(WPBKilled$Year.death..time.of.attack.or.time.of.injury.other.cause.[WPBKilled$DBH..cm.>31.6])/nrow(Pipo[Pipo$DBH..cm.>31.6,])
+SmlDeadYear<-table(WPBKilled$Year.death..time.of.attack.or.time.of.injury.other.cause.[WPBKilled$DBH..cm.<31.6])/nrow(Pipo[Pipo$DBH..cm.<31.6,])
+plot(LrgDeadYear)
+plot(SmlDeadYear)
+DeadYear<-table(WPBKilled$Year.death..time.of.attack.or.time.of.injury.other.cause.)/nrow(Pipo)
+```
+
+```{r}
+All<-Subset_All[ Subset_All$DIA_cm>10.0,]
+All<-All[!is.na(All$PLT_CN),]
+AllSub<-All[All$INVYR %in% c(2005,2006),]
+Mort<-Cal_Mort(All)
+bar<-barplot(Mort[[5]]*100,names.arg=Mort[[1]],main="Percent Mortality Western Pine Beetle >10. cm",
+        ylab="Percent of Mortality",cex.main=1.5,cex.lab=1.2,cex.axis=1.2,ylim=c(0,60))
+points(bar[12:15],DeadYear*100,cex=1.20,col="red",pch=19)
+legend(1,50,legend=c("Fettig et al., 2019","R2= 0.9247"),cex=1.2,col=c("red",NA),pch=c(19,NA),bty="n")
+
+```
+
+```{r}
+CF<-DeadYear*100
+FIA<-Mort[[5]][12:15]*100
+summary(lm(FIA~CF))
+CFall<-c(0,0,0,0,0,0,0,0,0,0,0,DeadYear*100,0)
+length(Mort[[5]])
+summary(lm(CFall~Mort[[5]]))
+```
+
+
+
+```{r}
+Lrg<-Subset_All[Subset_All$DIA_cm>31.8,]
+LrgSub<-Lrg[Lrg$INVYR %in% c(2005,2006),]
+LrgMort<-Cal_Mort(Lrg)
+LrgMort<-c(LrgMort)
+bar<-barplot(LrgMort[[5]][1:15]*100,names.arg=LrgMort[[1]][1:15],main="Percent Mortality Western Pine Beetle >31.8 cm",
+        ylab="% Mortality",cex.main=1.5,cex.lab=1.2,cex.axis=1.2,ylim=c(0,60))
+points(bar[12:15],c(LrgDeadYear*100,0),cex=1.2,col="red",pch=19)
+legend(1,50,legend=c("Fettig et al., 2019","R2= 0.8994"),cex=1.2,col=c("red",NA),pch=c(19,NA),bty="n")
+sum(LrgMort$per,na.rm=T)
+
+```
+
+
+
+```{r}
+CFL<-c(LrgDeadYear*100,0)
+FIAL<-LrgMort[[5]][12:15]*100
+summary(lm(FIAL~CFL))
+```
+
+
+```{r}
+#CalculateTrees(Lrg)
+Smll<-Subset_All[Subset_All$DIA_cm< 31.8& Subset_All$DIA_cm>10.0,]
+Smll<-Smll[!is.na(Smll$PLT_CN),]
+SmllSub<-Smll[Smll$INVYR %in% c(2005,2006),]
+SmllMort<-Cal_Mort(Smll)
+barplot(SmllMort[[5]]*100,names.arg=SmllMort[[1]],main="Percent Mortality Western Pine Beetle < 31.8 cm",
+        ylab="% Mortality",cex.main=1.5,cex.lab=1.2,cex.axis=1.2,ylim=c(0,35))
+#write.csv(Output,"PercentMortality.csv")
+points(bar[12:15],SmlDeadYear*100,cex=1.20,col="red",pch=19)
+sum(LrgMort$per,na.rm=T)
+sum(SmllMort$per,na.rm=T)
+Output<-cbind(SmllMort[[1]],Mort[[5]],SmllMort[[5]],LrgMort[[5]])
+legend(1,50,legend=c("Fettig et al., 2019","R2= 0.9260"),cex=1.2,col=c("red",NA),pch=c(19,NA),bty="n")
+#write.csv(Output,"C:/Users/zacha/Documents/GitHub/IMAP_Python_Project/WPB_Model/WPB_Inputs/WPBPercentMortality.csv")
+```
+
+```{r}
+CFS<-SmlDeadYear*100
+FIAS<-SmllMort[[5]][12:15]*100
+summary(lm(FIAS~CFS))
+```
+
+```{r,fig.width=7.0,fig.height=10.0}
+par(mfrow=c(3,1),mar=c(5.1,6.1,4.1,2.1))
+
+All<-Subset_All[ Subset_All$DIA_cm>10.0,]
+All<-All[!is.na(All$PLT_CN),]
+AllSub<-All[All$INVYR %in% c(2005,2006),]
+Mort<-Cal_Mort(All)
+bar<-barplot(Mort[[5]]*100,names.arg=Mort[[1]],main="A)            Percent Mortality Western Pine Beetle >10. cm",
+        ylab="%  Mortality",cex.main=1.5,cex.lab=2.0,cex.axis=1.2,cex.names=2,ylim=c(0,60))
+points(bar[12:15],DeadYear*100,cex=1.5,col="red",pch=19)
+legend(1,50,legend=c("Fettig et al., 2019","R2= 0.9247"),cex=2.0,col=c("red",NA),pch=c(19,NA),bty="n")
+
+Lrg<-Subset_All[Subset_All$DIA_cm>31.8,]
+LrgSub<-Lrg[Lrg$INVYR %in% c(2005,2006),]
+LrgMort<-Cal_Mort(Lrg)
+LrgMort<-c(LrgMort)
+bar<-barplot(LrgMort[[5]][1:16]*100,names.arg=LrgMort[[1]][1:16],main="B)            Percent Mortality Western Pine Beetle >31.8 cm",
+        ylab="% Mortality",cex.main=1.5,cex.lab=2.0,cex.names=2.0,cex.axis=1.2,ylim=c(0,60))
+points(bar[12:15],c(LrgDeadYear*100,0),cex=1.5,col="red",pch=19)
+legend(1,50,legend=c("Fettig et al., 2019","R2= 0.8994"),cex=2.0,col=c("red",NA),pch=c(19,NA),bty="n")
+
+Smll<-Subset_All[Subset_All$DIA_cm< 31.8& Subset_All$DIA_cm>10.0,]
+Smll<-Smll[!is.na(Smll$PLT_CN),]
+SmllSub<-Smll[Smll$INVYR %in% c(2005,2006),]
+SmllMort<-Cal_Mort(Smll)
+barplot(SmllMort[[5]]*100,names.arg=SmllMort[[1]],main="C)            Percent Mortality Western Pine Beetle < 31.8 cm",
+        ylab="% Mortality",cex.main=1.5,cex.lab=2.0,cex.names=2.0,cex.axis=1.2,ylim=c(0,60))
+#write.csv(Output,"PercentMortality.csv")
+points(bar[12:15],SmlDeadYear*100,cex=1.50,col="red",pch=19)
+sum(LrgMort$per,na.rm=T)
+sum(SmllMort$per,na.rm=T)
+Output<-cbind(SmllMort[[1]],Mort[[5]],SmllMort[[5]],LrgMort[[5]])
+legend(1,50,legend=c("Fettig et al., 2019","R2= 0.9260"),cex=2.0,col=c("red",NA),pch=c(19,NA),bty="n")
+#write.csv(Output,"C:/Users/zacha/Documents/GitHub/IMAP_Python_Project/WPB_Model/WPB_Inputs/WPBPercentMortality.csv")
+
+```
+
+```{r}
+#Drought
+#LrgMort[[5]][1:16]/([+LrgMort[[5]][1:16])
+
+Drought<-sum(LrgMort[[2]][12:15])/(sum(LrgMort[[2]][12:15])+sum(SmllMort[[2]][12:15]))
+NonDrought<-sum(LrgMort[[2]][c(1:11,16)])/(sum(LrgMort[[2]][c(1:11,16)])+sum(SmllMort[[2]][c(1:11,16)]))
+barplot(c(Drought,NonDrought),names.arg=c("Drought","Non Drought"),
+        main="Percent of Trees Killed in the Larger Size Class",ylim=c(0,.8),
+        cex.names=1.5,cex.axis=1.5)
+
+
+
+
+
+```
+
+
+
+```{r}
+
+# DF<-NULL
+# DF2<-NULL
+# #one<-PltsLUT[1,]
+# 
+# for(i in c(1,2,4,5)){
+#   print(paste0("########### Plot ",i,"  ###################"))
+#   Subset<-SortPlots(PltsLUT[i,],Sp)
+#   Trees<-CalculateTrees(Subset)
+#   print("All Trees")
+#   print(Trees[[1]])
+#   print("Large Trees")
+#   print(Trees[[2]])
+#   print("Small Trees")
+#   print(Trees[[3]])
+#   Lrg<-Subset[Subset$DIA_cm >31.6,]
+#   #LrgSub<-Lrg[Lrg$INVYR %in% c(2005,2006),]
+#   Mortlrg<-Cal_Mort(Lrg)
+#   Mortlrg<-Mortlrg[Mortlrg$year %in% seq(2006,2018),]
+#   MortlrgPass<-data.frame(year= seq(2006,2018))
+#   MortlrgPass<-merge(MortlrgPass,Mortlrg,by="year",all.x=T)
+#   Mortlrg<-MortlrgPass
+#   Mortlrg$per[is.na(Mortlrg$per)]<-0
+#   plot(Mortlrg[[5]],main=paste0("Large Mortality Site ", i ))
+#   Smll<-Subset[Subset$DIA_cm < 31.6 & Subset$DIA_cm > 10.0,]
+#   Smll<-Smll[!is.na(Smll$PLT_CN),]
+#   Mortsmll<-Cal_Mort(Smll)
+#   Mortsmll<-Mortsmll[Mortsmll$year %in% seq(2006,2018),]
+#   MortsmllPass<-data.frame(year= seq(2006,2017))
+#   MortsmllPass<-merge(MortsmllPass,Mortsmll,by="year",all.x=T)
+#   Mortsmll<-MortsmllPass
+#   Mortsmll$per[is.na(Mortsmll$per)]<-0
+#   plot(Mortsmll[[5]],main=paste0("Small Mortality Site ", i ))
+#  # barplot(Mortsmll[[6]],names.arg=Mortsmll[[1]])
+# #  Smlltree<-CalculateTrees(Smll)
+#   #Smlltree[1]
+#   Lrgtree<-Trees[[2]]
+#   Smlltree<-Trees[[3]]
+#   Mrs<-0
+#   Mrl<-0
+#   for(j in 1:13){
+#     #print(Ml)
+#     #print(Mortlrg[[1]][j])
+#     Ms<-Mortsmll[[5]][j]
+#     #print(Ms)
+#     Ml<-Mortlrg[[5]][j]
+#     #print(Ml)
+#     Smlltree<-c(Smlltree,Smlltree[j]-Smlltree[1]*Ms)
+#     Lrgtree<-c(Lrgtree,Lrgtree[j]-Lrgtree[1]*Ml)
+#     Mrs<-c(Mrs,Ms)
+#     Mrl<-c(Mrl,Ml)
+#   }
+#   Row<-c(PltsLUT[i,1],Lrgtree,Smlltree)
+#   DF<-rbind(Row,DF)
+#   Row2<-c(PltsLUT[i,1],Mrs,Mrl)
+#   DF2<-rbind(Row2,DF2)
+# }
+# 
+
+
+```
+
+#### New Attempt
+```{r}
+DF<-NULL
+DF2<-NULL
+#one<-PltsLUT[1,]
+
+for(i in c(1,2,4,5)){
+  print(paste0("########### Plot ",i,"  ###################"))
+  Subset<-SortPlots(PltsLUT[i,],Sp)
+  Trees<-CalculateTrees(Subset)
+  print("All Trees")
+  print(Trees[[1]])
+  print("Large Trees")
+  print(Trees[[2]])
+  print("Small Trees")
+  print(Trees[[3]])
+  Lrg<-Subset[Subset$DIA_cm >31.6,]
+  #LrgSub<-Lrg[Lrg$INVYR %in% c(2005,2006),]
+  Mortlrg<-Cal_Mort(Lrg)
+  Mortlrg<-Mortlrg[Mortlrg$year %in% seq(2006,2018),]
+  MortlrgPass<-data.frame(year= seq(2006,2018))
+  MortlrgPass<-merge(MortlrgPass,Mortlrg,by="year",all.x=T)
+  Mortlrg<-MortlrgPass
+  Mortlrg$per[is.na(Mortlrg$per)]<-0
+  plot(Mortlrg[[5]],main=paste0("Large Mortality Site ", i ))
+  print("Percent Mort large")
+  print(sum(Mortlrg$per))
+  Smll<-Subset[Subset$DIA_cm < 31.6 & Subset$DIA_cm > 10.0,]
+  Smll<-Smll[!is.na(Smll$PLT_CN),]
+  Mortsmll<-Cal_Mort(Smll)
+  Mortsmll<-Mortsmll[Mortsmll$year %in% seq(2006,2018),]
+  MortsmllPass<-data.frame(year= seq(2006,2018))
+  MortsmllPass<-merge(MortsmllPass,Mortsmll,by="year",all.x=T)
+  Mortsmll<-MortsmllPass
+  Mortsmll$per[is.na(Mortsmll$per)]<-0
+  plot(Mortsmll[[5]],main=paste0("Small Mortality Site ", i ))
+  print("Percent Mort Small")
+  print(sum(Mortsmll$per))
+ # barplot(Mortsmll[[6]],names.arg=Mortsmll[[1]])
+#  Smlltree<-CalculateTrees(Smll)
+  #Smlltree[1]
+  Lrgtree<-Trees[[2]]
+  Smlltree<-Trees[[3]]
+  Mrs<-0
+  Mrl<-0
+  for(j in 1:13){
+    #print(Ml)
+    #print(Mortlrg[[1]][j])
+    Ms<-Mortsmll[[5]][j]
+    #print(Ms)
+    Ml<-Mortlrg[[5]][j]
+    #print(Ml)
+    Smlltree<-c(Smlltree,Smlltree[j]-Smlltree[1]*Ms)
+    Lrgtree<-c(Lrgtree,Lrgtree[j]-Lrgtree[1]*Ml)
+    Mrs<-c(Mrs,Ms)
+    Mrl<-c(Mrl,Ml)
+  }
+  Row<-c(PltsLUT[i,1],Lrgtree,Smlltree)
+  DF<-rbind(Row,DF)
+  Row2<-c(PltsLUT[i,1],Mrs,Mrl)
+  DF2<-rbind(Row2,DF2)
+}
+
+```
+
+
+
+
+```{r}
+DF2[is.na(DF2)]<-0
+DF[is.na(DF)]<-0
+DF_Out<-as.data.frame(DF)
+colnames(DF_Out)<-c("Location","Initial_above_20","Large2006Perc","Large2007Perc","Large2008perc","Large2009perc",
+                    "Large2010perc","Large2011perc","Large2012perc","Large2013perc",
+                    "Large2014perc","Large2015perc",
+                    "Large2016perc","Large2017perc","Large20018Perc","Initial_below_20",
+                    "Small2006perc","Small2007perc","Small2008perc","Small2009perc",
+                    "Small2010perc","Small2011perc","Small2012perc","Small2013perc",
+                    "Small2014perc","Small2015perc","Small2016perc","Small2017perc","Small2018perc")
+
+colnames(DF_Out)
+DF_Out2<-DF_Out[,c(1,2,16,3:15,17:29)]
+
+
+```
+
+## Here is the mortality of tree mortality per time step 
+
+```{r}
+
+Lrg<-as.data.frame(DF_Out2[,1:16])
+Lrg<-Lrg[c(-1,-3)]
+for(i in 1:length(colnames(Lrg))){
+  Lrg[i]<-as.numeric(Lrg[[i]])
+}
+TreeSums<-colSums(Lrg)
+#Sums[-2]
+plot(seq(2005,2018,1),TreeSums,ylim=c(0,40))
+#TreeSums
+
+Df=data.frame(Dates=seq(2006,2018,1),TreeMortality=TreeSums[1:13]-TreeSums[2:14],
+              TreeTotal=TreeSums[1:13])
+Df$Percent<-Df$TreeMortality/Df$TreeTotal
+with(Df,barplot(Percent,names.arg=Dates,ylim=c(0,1.00)))
+
+#print(TreesSums)
+
+```
+
+### Here is the mortality as a function of the original Tree Total 
+
+```{r}
+Df$PercentOrg<-Df$TreeMortality/Df$TreeTotal[1]
+with(Df,barplot(PercentOrg,names.arg=Dates,ylim=c(0,1.0)))
+```
+
+### Here is Mortality Plotted Out
+
+
+```{r,fig.width=10.0,fig.height=10.0}
+
+library(RColorBrewer)
+Dark2<-brewer.pal(6,"Dark2")
+#colnames(MPB3)
+MPB3_plotter<-as.data.frame(DF_Out[,c(1:15)])
+MPB3_plotter<-t(MPB3_plotter)
+colnames(MPB3_plotter)<-MPB3_plotter[1,]
+MPB3_plotter<-MPB3_plotter[-1,]
+fix<-function(x){
+  as.numeric(as.character(x))
+}
+
+Dates<-seq(
+  from=as.POSIXct("2005-06-01 0:00", tz="UTC"),
+  to=as.POSIXct("2018-06-01 0:00", tz="UTC"),
+  by="year"
+)  
+#MPB3_plotter$Dates<-Dates
+
+plot(MPB3_plotter[,1],ylim=c(0,60),xaxt='n',main="WPB Host(>31.6 cm) Tree Density Over Time",ylab="Tree Density Per Ha",xlab="Date",type="l",cex=1.5,cex.axis=1.5,cex.lab=1.5,lwd=3.0)
+axis(1, at=1:14,labels =Dates, las=1,cex.axis=1.0,pch=15,cex=1.5,cex.axis=1.5,cex.lab=2.0)
+##points(MPB3_plotter[,2],pch=16,col=Dark2[1],cex=1.5)
+lines(MPB3_plotter[,2],lty=1,col=Dark2[2],cex=1.5,lwd=3.0)
+#points(MPB3_plotter[,4],pch=18,col=Dark2[3],cex=1.5)
+lines(MPB3_plotter[,3],lty=1,col=Dark2[4],cex=1.5,lwd=3.0)
+lines(MPB3_plotter[,4],lty=1,col=Dark2[5],cex=1.5,lwd=3.0)
+legend(9.0,50,legend=c("LowLat_HE","LowLat_LE","HighLat_HE","HighLat_LE"),cex=1.5,pch=c(15,15,15,15),col=c("Black",Dark2[2],Dark2[4],Dark2[5]))
+
+
+
+
+
+plot(fix(MPB3_plotter[,1])/max(fix(MPB3_plotter[,1])),type="l",ylim=c(0,1.2),main="WPB Host(> 31.6 cm) Population remaining",xaxt='n',xlab="Date",ylab="Intial population remaining",cex=1.5,cex.axis=1.5,cex.lab=1.5,lwd=3.0)
+axis(1, at=1:14,labels =Dates, las=1,cex=1.5,cex.axis=1.5,cex.lab=1.5)
+#points(fix(MPB3_plotter[,2])/fix(max(MPB3_plotter[,2])),pch=16,col=Dark2[1],cex=1.5)
+lines(fix(MPB3_plotter[,2])/max(fix(MPB3_plotter[,2])),pch=15,col=Dark2[2],cex=1.5,lwd=3.0)
+#points(fix(MPB3_plotter[,4])/fix(max(MPB3_plotter[,4])),pch=18,col=Dark2[3],cex=1.5)
+lines(fix(MPB3_plotter[,3])/max(fix(MPB3_plotter[,3])),pch=15,col=Dark2[3],cex=1.5,lwd=3.0)
+lines(fix(MPB3_plotter[,4])/max(fix(MPB3_plotter[,4])),pch=15,col=Dark2[5],cex=1.5,lwd=3.0)
+legend(1.2,.5,legend=c("LowLat_HE","LowLat_LE","HighLat_HE","HighLat_LE"),cex=1.5,pch=c(15,15,15,15),col=c("Black",Dark2[2],Dark2[3],Dark2[5]))
+
+
+
+```
+
+
+
+```{r,fig.width=10.0,fig.height=10.0}
+
+
+
+MPB3_plotter<-as.data.frame(DF_Out[,c(1,16:29)])
+MPB3_plotter<-t(MPB3_plotter)
+colnames(MPB3_plotter)<-MPB3_plotter[1,]
+MPB3_plotter<-MPB3_plotter[-1,]
+fix<-function(x){
+  as.numeric(as.character(x))
+}
+
+Dates<-seq(
+  from=as.POSIXct("2007-01-01 0:00", tz="UTC"),
+  to=as.POSIXct("2017-01-01 0:00", tz="UTC"),
+  by="year"
+)  
+
+plot(MPB3_plotter[,1],ylim=c(0,80),xaxt='n',main="WPB Host(<31.6 cm) Tree Density Over Time",ylab="Tree Density Per Ha",xlab="Date",type="l",cex=1.5,cex.axis=1.5,cex.lab=1.5,lwd=3.0)
+axis(1, at=1:11,labels =Dates, las=1,cex.axis=1.0,pch=15,cex=1.5,cex.axis=1.5,cex.lab=2.0)
+##points(MPB3_plotter[,2],pch=16,col=Dark2[1],cex=1.5)
+lines(MPB3_plotter[,2],lty=1,col=Dark2[2],cex=1.5,lwd=3.0)
+#points(MPB3_plotter[,4],pch=18,col=Dark2[3],cex=1.5)
+lines(MPB3_plotter[,3],lty=1,col=Dark2[4],cex=1.5,lwd=3.0)
+lines(MPB3_plotter[,4],lty=1,col=Dark2[5],cex=1.5,lwd=3.0)
+legend(9.0,300,legend=c("LowLat_HE","LowLat_LE","HighLat_HE","HighLat_LE"),cex=1.5,pch=c(15,15,15,15),col=c("Black",Dark2[2],Dark2[4],Dark2[5]))
+
+
+
+
+
+plot(fix(MPB3_plotter[,1])/max(fix(MPB3_plotter[,1])),type="l",ylim=c(0,1.2),main="WPB Host(<31.6 cm) Population remaining",xaxt='n',xlab="Date",ylab="Intial population remaining",cex=1.5,cex.axis=1.5,cex.lab=1.5,lwd=3.0)
+axis(1, at=1:11,labels =Dates, las=1,cex=1.5,cex.axis=1.5,cex.lab=1.5)
+#points(fix(MPB3_plotter[,2])/fix(max(MPB3_plotter[,2])),pch=16,col=Dark2[1],cex=1.5)
+lines(fix(MPB3_plotter[,2])/max(fix(MPB3_plotter[,2])),pch=15,col=Dark2[2],cex=1.5,lwd=3.0)
+#points(fix(MPB3_plotter[,4])/fix(max(MPB3_plotter[,4])),pch=18,col=Dark2[3],cex=1.5)
+lines(fix(MPB3_plotter[,3])/max(fix(MPB3_plotter[,3])),pch=15,col=Dark2[4],cex=1.5,lwd=3.0)
+lines(fix(MPB3_plotter[,4])/max(fix(MPB3_plotter[,4])),pch=15,col=Dark2[5],cex=1.5,lwd=3.0)
+legend(1.2,.5,legend=c("LowLat_HE","LowLat_LE","HighLat_HE","HighLat_LE"),cex=1.5,pch=c(15,15,15,15),col=c("Black",Dark2[2],Dark2[4],Dark2[5]))
+
+
+```
+
+```{r}
+DF_Out<-as.data.frame(DF)
+DF[is.na(DF)]<-0
+DF_Out<-as.data.frame(DF)
+colnames(DF_Out)<-c("Location","Initial_above_20","Large2006Perc","Large2007Perc","Large2008perc","Large2009perc",
+                    "Large2010perc","Large2011perc","Large2012perc","Large2013perc",
+                    "Large2014perc","Large2015perc",
+                    "Large2016perc","Large2017perc","Large20018Perc","Initial_below_20",
+                    "Small2006perc","Small2007perc","Small2008perc","Small2009perc",
+                    "Small2010perc","Small2011perc","Small2012perc","Small2013perc",
+                    "Small2014perc","Small2015perc","Small2016perc","Small2017perc","Small2018perc")
+
+colnames(DF_Out)
+DF_Out2<-DF_Out[,c(1,2,16,3:15,17:29)]
+
+
+
+write.csv(DF_Out2,paste0(Drive,"/WPB_Model/WPB_Inputs/WPB_Trees_6_20.csv"))
+```
+
+
+
+#### Extra
+
+#### Mortality at Elevation
+PltsLUT<-data.frame(Name=c("UpperLow","UpperMed","HighLatitude","LowerLow","LowerMed","LowLatitude"),
+                    Patch=c(1,2,3,4,5,6),
+                    LowEl=c(400,1400,400, 400,1500,400),
+                    HighEl=c(1400,2000,2000,1500,2200,2200),
+                    LatLow=c(37.5,37.5,37.5,33,33,33),
+                    LatHigh=c(40,40,40,37.5,37.5,37.5))
+
+```{r}
+#Low_Elevation
+LE1<-SortPlots(PltsLUT[1,],Sp)
+LE2<-SortPlots(PltsLUT[4,],Sp)
+Subset_All<-rbind(LE2,LE1)
+OutTrees<-CalculateTrees(Subset_All)
+print(OutTrees[[1]])
+print(OutTrees[[2]])
+print(OutTrees[[3]])
+
+All<-Subset_All[ Subset_All$DIA_cm>10.0,]
+All<-All[!is.na(All$PLT_CN),]
+AllSub<-All[All$INVYR %in% c(2005,2006),]
+MortLE<-Cal_Mort(All)
+# barplot(MortLE[[5]],names.arg=Mort[[1]],main="Percent Mortality Western Pine Beetle >10. cm",
+#         ylab="% Mortality",cex.main=1.5,cex.lab=1.2,cex.axis=1.2)
+# sum(Mort$per)
+```
+
+```{r}
+HE1<-SortPlots(PltsLUT[2,],Sp)
+HE2<-SortPlots(PltsLUT[5,],Sp)
+Subset_All<-rbind(HE2,HE1)
+OutTrees<-CalculateTrees(Subset_All)
+print(OutTrees[[1]])
+print(OutTrees[[2]])
+print(OutTrees[[3]])
+
+All<-Subset_All[ Subset_All$DIA_cm>10.0,]
+All<-All[!is.na(All$PLT_CN),]
+AllSub<-All[All$INVYR %in% c(2005,2006),]
+MortHE<-Cal_Mort(All)
+# barplot(MortHE[[5]],names.arg=Mort[[1]],main="Percent Mortality Western Pine Beetle >10. cm",
+#         ylab="% Mortality",cex.main=1.5,cex.lab=1.2,cex.axis=1.2)
+# sum(Mort$per)
+```
+```{r,fig.width=20.0,fig.height=10.0}
+MortHE$EL<-"High"
+MortLE$EL<-"Low"
+Mortall<-rbind(MortHE,MortLE)
+Mortall<-Mortall[,c(-2,-3,-4)]
+#Mortall
+
+d <- data.frame(row.names=seq(2003,2018), High_Elevation =MortHE$per*100, 
+                Low_Elevation = MortLE$per*100)
+d<-do.call(rbind,d)
+#tab<-reshape2::melt(Mortall,id.vars=c("year","EL"))
+#?melt
+par(mar=c(7,7,7,5),xpd=F)
+barplot(d,beside=T,names.arg=MortHE$year, legend.text = rownames(d), 
+        args.legend = list(x = "topleft", bty="n",cex= 3),ylab="Percent Mortality",
+        main="Western Pine Beetle Mortality",cex=3.0,cex.main=5.0,cex.lab=3.0,cex.axis=3.0
+        )
+```
+

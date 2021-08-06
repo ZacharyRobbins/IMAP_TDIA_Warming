@@ -1,0 +1,516 @@
+---
+title: "Looking at other equations"
+author: "Zjrobbin"
+date: "7/28/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+###Logan 
+
+#Rate*((((T-Tb)**2)/((T-Tb)**2+k))-exp(-(Tm-(T-Tb))/dm))
+#Where tb=minimum
+# Tm=Maximum
+# and the other three are fits?
+LoganPlot=function(Temp,Rate,Tb,Tm,kappa,delm){
+   Rt=Rate*((((Temp-Tb)**2)/(((Temp-Tb)**2)+kappa))-exp(-(Tm-(Temp-Tb))/delm))
+  return(Rt)  
+}
+```
+
+93F is the maximum temperature for adults
+14.0 inches constructed for each attack
+Commencing with the first eggs which are usually laid about 8 days after attack
+egg laying continues from 10-49 days with an average of about 23 days
+The range of activity for adults is from none around 50*F to most active around  86 degrees
+The maximum temperautre is around 93C 
+```{r}
+
+Temp<-c(51,93)
+Time<-c(67,18)
+Temp<-F2C(Temp)
+Object<-lm(Time~Temp)
+Temps<-seq(10,30)
+
+plot(Temps,Object$coefficients[1]+Temps*Object$coefficients[2],ylab="Days of oviposition",ylim=c(0,60))
+
+```
+
+```{r}
+Ovi<-data.frame(Temp=c(50,83,86,93),
+                 Days=c(49,10,10,49))
+Ovi$Temp<-F2C(Ovi$Temp)
+DataO<-Ovi
+TmO=36.889
+LoganFunction=function (Temp,par,k){
+  #Rt= par[1]*exp(-.5*(((Temp-par[2])/par[3])^2))
+  Rt=par[1]*((((Temp-par[2])**2)/(((Temp-par[2])**2)+par[3]))-exp(-(TmE-(Temp-par[2]))/par[4]))
+  #-sum(dnorm(k,mean=1/(1-exp(-Rt)),sd=1,log=TRUE))
+-(((23-mean(1/(1-exp(-Rate_sim))))**2)+((10-min(1/(1-exp(-Rate_sim))))**2)+((49-max(1/(1-exp(-Rate_sim))))**2))
+  }
+opt1=optim(fn=LoganFunction,par=c(2.20,-1.50,15000.00,.70),Temp=as.numeric(DataE[,1]),k=(DataE[,2]))
+?optim()
+
+
+(RateO<-opt1$par[1])
+print("Tb")
+(TbO<-opt1$par[2])
+(kappaO<-opt1$par[3])
+(delmO<-opt1$par[4])
+
+FakeTemp<-seq(10,33,.1)
+Rate_sim<-LoganPlot(FakeTemp,RateO,TbO,TmO,kappaO,delmO)
+
+#print(cbind(FakeTemp,Rate))
+plot(FakeTemp,1/(1-exp(-Rate_sim)),xlim=c(0,40),ylim=c(0,100),main="Rate of development of Eggs",
+          xlab="Temp",cex.lab=1.5,cex=2.0,cex.axis=2.0) 
+#lines(FakeTemp,Rate/1-(.25*Rate/1))
+#lines(FakeTemp,Rate+(.25*Rate))
+points(Ovi[,1],Ovi[,2],col="red",pch=16)
+legend(0,.3,legend=c("Modeled","Observed"),pch=c(1,16),col=c('black',"red"))
+
+mean(1/(1-exp(-Rate_sim)))
+min(1/(1-exp(-Rate_sim)))
+max(1/(1-exp(-Rate_sim)))
+
+
+```
+```{r}
+Rate_sim<-LoganPlot(FakeTemp,.320,-1.50,35.889,2000,1.05)
+
+#print(cbind(FakeTemp,Rate))/
+plot(FakeTemp,1/(1-exp(-Rate_sim)),xlim=c(0,40),ylim=c(0,70),main="Rate of development of Eggs",
+          xlab="Temp",cex.lab=1.5,cex=2.0,cex.axis=2.0) 
+#lines(FakeTemp,Rate/1-(.25*Rate/1))
+#lines(FakeTemp,Rate+(.25*Rate))
+points(Ovi[,1],Ovi[,2],col="red",pch=16)
+legend(0,.3,legend=c("Modeled","Observed"),pch=c(1,16),col=c('black',"red"))
+
+
+max(1/(1-exp(-Rate_sim)))
+-(((23-mean(1/(1-exp(-Rate_sim))))**2)+((10-min(1/(1-exp(-Rate_sim))))**2)+((49-max(1/(1-exp(-Rate_sim))))**2))
+
+
+```
+
+
+
+```{r}
+Rate_sim<-LoganPlot(FakeTemp,.040,-1.50,35.889,2000,1.05)
+
+#print(cbind(FakeTemp,Rate))/
+plot(FakeTemp,1/(1-exp(-Rate_sim)),xlim=c(0,40),ylim=c(0,8*70),main="Rate of development of Eggs",
+          xlab="Temp",cex.lab=1.5,cex=2.0,cex.axis=2.0) 
+#lines(FakeTemp,Rate/1-(.25*Rate/1))
+#lines(FakeTemp,Rate+(.25*Rate))
+points(Ovi[,1],8*Ovi[,2],col="red",pch=16)
+legend(0,.3,legend=c("Modeled","Observed"),pch=c(1,16),col=c('black',"red"))
+
+
+max(1/(1-exp(-Rate_sim)))
+-(((23-mean(1/(1-exp(-Rate_sim))))**2)+((10-min(1/(1-exp(-Rate_sim))))**2)+((49-max(1/(1-exp(-Rate_sim))))**2))
+
+
+```
+
+
+
+#### Egg Development
+
+From Miller and Keen 
+Egg development can not occur at temperatures below 50*
+
+Based on values in Miller and Keen (Pg 20)
+* At 60*F $^\circ$F 20 out of 59 eggs hatched in 16 days (40% in 16 days)(completed rate in 40 days)
+* At 55*F $^\circ$F 14 out of 50 eggs hatched in 16 days (28% in 16 days)(completed rate in 57.142 days)
+* At 53*F $^\circ$F 7 out of 50 eggs hatced in 16 days (14% in 16 days)(completed rate in 114.142 days)
+* At and below 40 *F $^\circ$ F 0 of 50 eggs hatched in 21 days
+
+Opitimal temperatures in which incubation is completed in 7 days are probably between 70-90 degrees. 
+
+
+Beal found that sustained high temperatures between 102 and 106 *F were fatal to all eggs 
+
+
+```{r}
+
+Eggs<-data.frame(Temp=c(53,55,60,70,90),
+                 Days=c(114*8,57*8,40*8,7*8,7*8))
+Eggs$Temp<-F2C(Eggs$Temp)
+```
+
+
+```{r}
+#Tm is 102*F or 38.889
+DataE<-Eggs
+TmE=38.889
+
+LoganFunction=function (Temp,par,k){
+  #Rt= par[1]*exp(-.5*(((Temp-par[2])/par[3])^2))
+  Rt=par[1]*((((Temp-par[2])**2)/(((Temp-par[2])**2)+par[3]))-exp(-(par[5]-(Temp-par[2]))/par[4]))
+  -sum(dnorm(k,mean=Rt,sd=3.0,log=TRUE))
+  }
+
+
+opt1=optim(fn=LoganFunction,par=c(.18,10,1000,.005,39.9),Temp=as.numeric(DataE[,1]),k=(1/DataE[,2]))
+
+print("RateE")
+(RateE<-opt1$par[1])
+print("Tb")
+(TbE<-opt1$par[2])
+(kappaE<-opt1$par[3])
+(delmE<-opt1$par[4])
+(TmE<-opt1$par[5])
+
+FakeTemp<-seq(TbE,TmE,1)
+Rate_sim<-LoganPlot(FakeTemp,RateE,TbE,TmE,kappaE,delmE)
+
+#print(cbind(FakeTemp,Rate))
+plot(FakeTemp,Rate_sim,xlim=c(0,40),ylim=c(0,.05),main="Rate of development of Eggs",
+          xlab="Temp",cex.lab=1.5,cex=2.0,cex.axis=2.0) 
+#lines(FakeTemp,Rate/1-(.25*Rate/1))
+#lines(FakeTemp,Rate+(.25*Rate))
+points(Eggs[,1],1/Eggs[,2],col="red",pch=16)
+legend(0,.3,legend=c("Modeled","Observed"),pch=c(1,16),col=c('black',"red"))
+
+
+```
+
+
+
+```{r}
+plot(FakeTemp,1/Rate_sim,main="Duration of Egg Stage",
+     xlab="Temp",ylab="Duration",ylim=c(0,800),cex.lab=1.5,cex=2.0,cex.axis=1.5,xlim=c(0,45)) 
+points(DataE[,1],DataE[,2],col="red",pch=16)
+legend(4.0,100,legend=c("Modeled","Observed"),pch=c(1,16),col=c('black',"red"))
+```
+
+
+
+
+### Larvae
+```{r cars}
+Larvae<-data.frame(Temp=c(51,60,70,85),
+                   Days=c(296.9*8,29.69583*8,20*8,20*8))
+
+Larvae$Temp<-F2C(Larvae$Temp)
+Data<-Larvae
+LoganPlot=function(Temp,Rate,Tb,Tm,kappa,delm){
+   Rt=Rate*((((Temp-Tb)**2)/(((Temp-Tb)**2)+kappa))-exp(-(Tm-(Temp-Tb))/delm))
+  return(Rt)  
+}
+```
+
+
+
+
+```{r pressure, echo=FALSE}
+
+#Assuming Tm is 35C/
+TmL=37.8
+LoganFunction=function (Temp,par,k){
+  #Rt= par[1]*exp(-.5*(((Temp-par[2])/par[3])^2))
+  Rt=par[1]*((((Temp-par[2])**2)/(((Temp-par[2])**2)+par[3]))-exp(-(TmL-(Temp-par[2]))/par[4]))
+  -sum(dnorm(k,mean=Rt,sd=1,log=TRUE))
+}
+opt1=optim(fn=LoganFunction,par=c(.01,4,800,6),Temp=as.numeric(Data[,1]),k=(1/Data[,2]))
+
+(RateL<-opt1$par[1])
+print("Tmax1")
+(TbL<-opt1$par[2])
+print("Tdelta1")
+(kappaL<-opt1$par[3])
+
+(delmL<-opt1$par[4])
+
+
+
+
+FakeTemp<-seq(TbL,TmL,1)
+Rate_sim<-LoganPlot(FakeTemp,RateL,TbL,TmL,kappaL,delmL)
+
+#print(cbind(FakeTemp,Rate))
+plot(FakeTemp,Rate_sim,xlim=c(0,40),ylim=c(0,.04),main="Rate of development of Larvae",
+          xlab="Temp",cex.lab=1.5,cex=2.0,cex.axis=2.0) 
+#lines(FakeTemp,Rate/1-(.25*Rate/1))
+#lines(FakeTemp,Rate+(.25*Rate))
+points(Larvae[,1],1/Larvae[,2],col="red",pch=16)
+legend(0,.3,legend=c("Modeled","Observed"),pch=c(1,16),col=c('black',"red"))
+
+
+```
+
+
+```{r}
+plot(FakeTemp,1/Rate_sim,main="Duration of Larval Stage",
+     xlab="Temp",ylab="Duration",ylim=c(0,800),cex.lab=1.5,cex=2.0,cex.axis=1.5,xlim=c(0,40)) 
+points(Data[,1],Data[,2],col="red",pch=16)
+legend(2.0,100,legend=c("Modeled","Observed"),pch=c(1,16),col=c('black',"red"))
+```
+
+Larvae may be more accurately placed at 100-110F versus 95F
+
+
+# Pre-pupal to Pupae
+
+From Miller and Keen  (Whiteside's experiment)
+
+* Degrees(F)	Average time Pre-pupal to pupae(days)
+* 74	2
+* 65	3
+* 60	4
+* 55	7
+
+Note: When mature larvae were exposed at 50* F a few pupae formed after 117 days
+
+```{r}
+Pre_pupal<-data.frame(Temp=c(50,55,60,65,74),
+                      Days=c(117*8,7*8,4*8,3*8,2*8))
+
+Pre_pupal$Temp<-F2C(Pre_pupal$Temp)
+DataPP<-Pre_pupal
+```
+
+I include the same maximum tmperature for larvae here, I have no source for maximum pre-pupal survival temperature 
+
+
+```{r}
+#Assuming Tm is 35C/
+TmPP=37.8
+LoganFunction=function (Temp,par,k){
+  #Rt= par[1]*exp(-.5*(((Temp-par[2])/par[3])^2))
+  Rt=par[1]*((((Temp-par[2])**2)/(((Temp-par[2])**2)+par[3]))-exp(-(TmL-(Temp-par[2]))/par[4]))
+  -sum(dnorm(k,mean=Rt,sd=1,log=TRUE))
+}
+opt1=optim(fn=LoganFunction,par=c(.5,8,400,1),Temp=as.numeric(DataPP[,1]),k=(1/DataPP[,2]))
+
+(RatePP<-opt1$par[1])
+print("Tmax1")
+(TbPP<-opt1$par[2])
+print("Tdelta1")
+(kappaPP<-opt1$par[3])
+
+(delmPP<-opt1$par[4])
+
+
+
+
+FakeTemp<-seq(10,TmPP,1)
+Rate_sim<-LoganPlot(FakeTemp,RatePP,TbPP,TmPP,kappaPP,delmPP)
+
+#print(cbind(FakeTemp,Rate))
+plot(FakeTemp,Rate_sim,xlim=c(0,40),ylim=c(0,.08),main="Rate of development of PrePupal",
+          xlab="Temp",cex.lab=1.5,cex=2.0,cex.axis=2.0) 
+#lines(FakeTemp,Rate/1-(.25*Rate/1))
+#lines(FakeTemp,Rate+(.25*Rate))
+points(Pre_pupal[,1],1/Pre_pupal[,2],col="red",pch=16)
+legend(0,.3,legend=c("Modeled","Observed"),pch=c(1,16),col=c('black',"red"))
+
+```
+
+```{r}
+plot(FakeTemp,1/Rate_sim,main="Duration of PP Stage",
+     xlab="Temp",ylab="Duration",ylim=c(0,40),cex.lab=1.5,cex=2.0,cex.axis=1.5,xlim=c(0,100)) 
+points(Pre_pupal[,1],Pre_pupal[,2],col="red",pch=16)
+legend(4.0,100,legend=c("Modeled","Observed"),pch=c(1,16),col=c('black',"red"))
+```
+
+
+Average time pupae to callow adult 
+From Miller and Keen Whiteside.
+
+* Degrees(F)	 (days)
+
+* 74	6
+* 65	6
+* 60	12
+* 55	24
+* 50	51
+
+I include the same maximum tmperature for larvae here, I have no source for maximum  pupal survival temperature 
+
+```{r}
+Pupal<-data.frame(Temp=c(50,55,60,65,74),
+                      Days=c(51*8,24*8,12*8,6*8,6*8))
+Pupal$Temp<-F2C(Pupal$Temp)
+DataP<-Pupal
+```
+
+
+```{r}
+#Assuming Tm is 37.8C/
+TmP=37.8
+
+
+LoganFunction=function (Temp,par,k){
+  #Rt= par[1]*exp(-.5*(((Temp-par[2])/par[3])^2))
+  Rt=par[1]*((((Temp-par[2])**2)/(((Temp-par[2])**2)+par[3]))-exp(-(TmP-(Temp-par[2]))/par[4]))
+  -sum(dnorm(k,mean=Rt,sd=1,log=TRUE))
+}
+opt1=optim(fn=LoganFunction,par=c(.5,8,200,6),Temp=as.numeric(DataP[,1]),k=(1/DataP[,2]))
+
+(RateP<-opt1$par[1])
+print("Tmax1")
+(TbP<-opt1$par[2])
+print("Tdelta1")
+(kappaP<-opt1$par[3])
+
+(delmP<-opt1$par[4])
+
+
+FakeTemp<-seq(TbP,TmP,1)
+Rate_sim<-LoganPlot(FakeTemp,RateP,TbP,TmP,kappaP,delmP)
+
+#print(cbind(FakeTemp,Rate))
+plot(FakeTemp,Rate_sim,xlim=c(0,40),ylim=c(0,.03),main="Rate of development of Pupal",
+          xlab="Temp",cex.lab=1.5,cex=2.0,cex.axis=2.0) 
+#lines(FakeTemp,Rate/1-(.25*Rate/1))
+#lines(FakeTemp,Rate+(.25*Rate))
+points(Pupal[,1],1/Pupal[
+  ,2],col="red",pch=16)
+legend(0,.3,legend=c("Modeled","Observed"),pch=c(1,16),col=c('black',"red"))
+
+```
+
+```{r}
+#print(cbind(FakeTemp,Rate))
+plot(FakeTemp,1/Rate_sim,xlim=c(0,40),ylim=c(0,60),main="Duration of development of Pupal",
+          xlab="Temp",cex.lab=1.5,cex=2.0,cex.axis=2.0) 
+#lines(FakeTemp,Rate/1-(.25*Rate/1))
+#lines(FakeTemp,Rate+(.25*Rate))
+points(Pupal[,1],Pupal[,2],col="red",pch=16)
+legend(0,20,legend=c("Modeled","Observed"),pch=c(1,16),col=c('black',"red"))
+```
+
+```{r}
+Preflight<-data.frame(Temp=c(50,55,60,65,74),
+                      Days=c(18.2*8,18.2*8,18.2*8,18.2*8,18.2*8))
+Preflight$Temp<-F2C(Preflight$Temp)
+```
+
+```{r}
+TmA=50.8
+
+DataTA<-Preflight
+##### Taylor function set up. 
+
+LoganFunction=function (Temp,par,k){
+  #Rt= par[1]*exp(-.5*(((Temp-par[2])/par[3])^2))
+  Rt=par[1]*((((Temp-par[2])**2)/(((Temp-par[2])**2)+par[3]))-exp(-(TmA-(Temp-par[2]))/par[4]))
+  -sum(dnorm(k,mean=Rt,sd=1,log=TRUE))
+}
+opt1=optim(fn=LoganFunction,par=c(.01,0,0,0),Temp=as.numeric(DataTA[,1]),k=(1/DataTA[,2]))
+
+(RateA<-opt1$par[1])
+print("Tmax1")
+(TbA<-opt1$par[2])
+print("Tdelta1")
+(kappaA<-opt1$par[3])
+
+(delmA<-opt1$par[4])
+
+```
+
+
+```{r}
+FakeTemp<-seq(0,40,1)
+
+#Rate<-Taylor_Plot(FakeTemp,Rmax5,Tmax5,Tdelta5)
+
+#FakeTemp<-seq(TbA,TmA,1)
+Rate_sim<-LoganPlot(FakeTemp,RateA,TbA,TmA,kappaA,delmA)
+Rate_sim<-LoganPlot(FakeTemp,.01568408*8,50.8,-0.002603655,-0.003262513,0.0005461579)
+#print(cbind(FakeTemp,Rate))
+plot(FakeTemp,Rate_sim,xlim=c(0,40),ylim=c(0,.2),main="Rate of development of Preflight",
+          xlab="Temp",cex.lab=1.5,cex=2.0,cex.axis=2.0) 
+
+
+
+
+
+
+#lines(FakeTemp,Rate/1-(.25*Rate/1))
+#lines(FakeTemp,Rate+(.25*Rate)
+points(DataTA[,1],1/DataTA[
+  ,2],col="red",pch=16)
+legend(0,.3,legend=c("Modeled","Observed"),pch=c(1,16),col=c('black',"red"))
+
+```
+
+```{r}
+plot(FakeTemp,1/(Rate_sim),main="Duration of Preemergence Stage",
+     xlab="Temp",ylab="Duration",cex.lab=1.5,cex=2.0,cex.axis=1.5,ylim=c(0,20)) 
+points(DataTA[,1],DataTA[
+  ,2],col="red",pch= 16)
+legend(1.0,100,legend=c("Modeled","Observed"),pch=c(1,16),col=c('black',"red"))
+
+```
+
+
+```{r}
+146.7494/8
+```
+
+#### Post fligh t
+
+
+
+
+
+
+```{r}
+Preflight<-data.frame(Temp=c(50,55,60,65,74,95),
+                      Days=c(8*8,8*8,8*8,8*8,8*8,8*8))
+Preflight$Temp<-F2C(Preflight$Temp)
+TmA=50.8
+
+DataTA<-Preflight
+##### Taylor function set up. 
+
+LoganFunction=function (Temp,par,k){
+  #Rt= par[1]*exp(-.5*(((Temp-par[2])/par[3])^2))
+  Rt=par[1]*((((Temp-par[2])**2)/(((Temp-par[2])**2)+par[3]))-exp(-(TmA-(Temp-par[2]))/par[4]))
+  -sum(dnorm(k,mean=Rt,sd=1,log=TRUE))
+}
+opt1=optim(fn=LoganFunction,par=c(.01,0,0,0),Temp=as.numeric(DataTA[,1]),k=(1/DataTA[,2]))
+
+(RateA<-opt1$par[1])
+print("Tmax1")
+(TbA<-opt1$par[2])
+print("Tdelta1")
+(kappaA<-opt1$par[3])
+
+(delmA<-opt1$par[4])
+
+```
+
+
+```{r}
+FakeTemp<-seq(0,40,1)
+1/8
+#Rate<-Taylor_Plot(FakeTemp,Rmax5,Tmax5,Tdelta5)
+
+#FakeTemp<-seq(TbA,TmA,1)
+Rate_sim<-LoganPlot(FakeTemp,RateA,TbA,TmA,kappaA,delmA)
+
+#print(cbind(FakeTemp,Rate))
+plot(FakeTemp,Rate_sim,xlim=c(0,40),ylim=c(0,.3),main="Rate of development of Preflight",
+          xlab="Temp",cex.lab=1.5,cex=2.0,cex.axis=2.0) 
+#lines(FakeTemp,Rate/1-(.25*Rate/1))
+#lines(FakeTemp,Rate+(.25*Rate))
+points(DataTA[,1],1/DataTA[
+  ,2],col="red",pch=16)
+legend(0,.3,legend=c("Modeled","Observed"),pch=c(1,16),col=c('black',"red"))
+
+```
+
+```{r}
+plot(FakeTemp,1/Rate_sim,main="Duration of Preemergence Stage",
+     xlab="Temp",ylab="Duration",cex.lab=1.5,cex=2.0,cex.axis=1.5,ylim=c(0,100)) 
+points(DataTA[,1],DataTA[
+  ,2],col="red",pch= 16)
+legend(1.0,100,legend=c("Modeled","Observed"),pch=c(1,16),col=c('black',"red"))
+
+```
+```
+

@@ -1,0 +1,1282 @@
+---
+title: "Insect_Fitting"
+author: "Z. Robbins"
+date: "9/12/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+```
+
+
+Sources:[Miller and Keen 1960](https://play.google.com/books/reader?id=_HkWAAAAYAAJ&printsec=frontcover&pg=GBS.PA35)
+
+[Gaylord 2008](https://academic.oup.com/ee/article/37/1/57/548779)
+
+
+### This is a curve, based on Gaylord, using the formula inherint to the model. 
+
+
+```{r}
+temps<-seq(13,40,1)
+print(temps)
+length(temps)
+vals=c(.0001,.0001,.0002,.0005,.007,.001,.038,.05,.02,.06,.02,
+       .05,.05,.1,.05,.08,.1,.03,.1,.08,.03,.02,.04,.03,.02,.019,.0005,.0004)
+sum(vals)
+length(vals)
+vals_scaled<-vals*10*1.48
+
+polynomial_fitter<-function(Temp,par,y_obs){
+ y=par[1]+(par[2]*Temp)+(par[3]*Temp**2)+(par[4]*Temp**3)+(par[5]*Temp**4)+(par[6]*Temp**5)
+return(-sum(dnorm(y_obs,mean=y,sd=.001,log=TRUE)))  
+}
+fit<-optim(fn=polynomial_fitter,par=c(1.0,0.0001,1e-4,.1e-8,.1e-6,.1e-6),Temp=as.numeric(temps),y_obs=as.numeric(vals_scaled))
+
+(x1<-fit$par[1])
+(x2<-fit$par[2])
+(x3<-fit$par[3])
+(x4<-fit$par[4])
+(x5<-fit$par[5])
+(x6<-fit$par[6])
+
+
+
+
+polynomial_plotters<-function(Temp,x1,x2,x3,x4,x5,x6){
+  Temp=temps
+  y=x1+(x2*Temp)+(x3*Temp**2)+(x4*Temp**3)+(x5*Temp**4)+(x6*Temp**5)
+  return(y)
+  }
+Y<-polynomial_plotters(temps,x1,x2,x3,x4,x5,3.200559e-07)
+sum(Y)
+plot(temps,Y)
+max(Y)
+
+```
+
+
+
+```{r}
+polynomial_plotters<-function(Temp,x1,x2,x3,x4,x5,x6){
+  Temp=temps
+  y=x1+(x2*Temp)+(x3*(Temp**2))+(x4*(Temp**3))+(x5*(Temp**4))+(x6*(Temp**5))
+  return(y)
+}
+zx1<- 2.500e+01
+zx2<-(-5.324e+00)
+zx3<-4.277e-01
+zx4<-(-1.633e-02)
+zx5<-3.014e-04
+zx6<-(-2.172e-06)
+
+Y<-polynomial_plotters(temps,zx1,zx2,zx3,zx4,zx5,zx6)
+sum(Y)
+plot(temps,Y)
+max(Y)
+```
+
+
+
+### Fitting the Winter mortality curve
+
+```{r}
+# recreating keen and Furniss
+MK_Df<-data.frame(Name=c("Klamath","Ochoco","Fremont","Deschutes1","Deschutes2","Deschutes3","Rogue",
+                "Klickitat","Wenatchee","Deschutes4","Deschutes5","Umatilla","Klamath2","Klamath3","Ochooco2","Klamath4","Fremont","Whitman","Ochoco3","Malheur","Ochoco4","Malheur2","Malheur3",
+                "Malheur4"),
+         MinTemp=c(2,0,-13,-15,-20,-20,-10,-13,-14,-22,-22,-25,-25,-26,-26,-26,-26,
+                   -35,-35,-35,-35,-44,-44,-44),
+         PerBroodMort=c(6.8,8.5,38.8,43.8,56.8,60.7,33.6,40.6,26.1,46.1,47,50.2,87.6,53,68,75,76.6,61.3,79.9,87.3,90.7,81.3,84.6,86.8))
+
+
+MK_Df$MinTemp_C<-F2C(MK_Df$MinTemp)
+MK_Df$PerBroodMortAdj<-MK_Df$PerBroodMort*.01
+plot(MK_Df$MinTemp_C,MK_Df$PerBroodMortAdj,)
+#(1.0 + exp(-(ColdestT + 35.4185)/2.0)
+
+### The model calculates survival rate. So we need to calculate the inverse of the equation from the model 
+
+
+DG_WinterMort<-function(ColdestT,par,Obs_Per){
+  
+  y<-1-(1/(1.0+exp(-(ColdestT+par[1])/2)))
+  -sum(dnorm(Obs_Per,mean=y,sd=.1,log=TRUE))
+} 
+
+
+opt1=optimize(f=DG_WinterMort,interval=c(.01,100),ColdestT=as.numeric(MK_Df$MinTemp_C),Obs_Per=as.numeric(MK_Df$PerBroodMortAdj))
+
+# 
+?optimize
+# ?lm() 
+# lm(as.numeric(MK_Df$MinTemp_C)~as.numeric(MK_Df$PerBroodMortAdj))
+
+
+(par1<-as.numeric(opt1$minimum))
+#par2<-as.numeric(opt1$par[2])
+DG_WM_plot<-function(ColdestT,par1){
+ y<-1-(1/(1.0+exp(-(ColdestT+par1)/2)))
+ 
+ 
+ }
+
+
+
+a<-DG_WM_plot(seq(0,-60,-.1),par=par1)
+plot(seq(0,-60,-.1),a*100)
+points(MK_Df$MinTemp_C,100*MK_Df$PerBroodMortAdj)
+
+###Surival rate
+Survival<-1/(1.0+exp(-(seq(0,-60,-.1)+par1)/2))
+plot(seq(0,-60,-.1),Survival)
+
+```
+
+
+
+###Fatal temepratures
+Miller Keen: 
+
+100-110*F
+
+Activity continues up to 105 mortality occurs 110 
+We will treat development as reaching 0 at 105
+
+-28.8 C As majority mortality point
+
+
+###FLight temperuatre: 18.6 C M With a majority occuring betwee 19-38.9 C 
+[Gaylord 2008](https://academic.oup.com/ee/article/37/1/57/548779)
+
+
+General Assumption of these plots 
+
+
+
+#### Ovipostion
+We have gone with the oviposition in the MPB model. 
+```{r}
+TC<-seq(0,44,.1)
+TB=4.6341
+DeltaB=.1
+TM=27.7587
+DeltaM=3.0759
+omega=.3684
+psi=.005199
+
+DevR = psi*(exp(omega*(TC - TB)) - (TM - TC)/(TM - TB)*exp(-omega*(TC - TB)/DeltaB) - (TC - TB)/(TM - TB)*exp(omega*(TM - TB) - (TM - TC)/DeltaM))
+
+plot(TC,1/DevR,ylim=c(0,100))
+```
+
+
+Based on a published understanding of a 23 day mean and 10-43 day range
+(Miller and Keen)
+
+
+```{r}
+F2C<-function(F){
+  C=(F-32)*(5/9)
+  return(C)
+}
+  
+Taylor_Plot=function(Temp,Rmax,Tmax,Tdelta){
+  Rt=Rmax*(exp(-.5*(((Temp-Tmax)/Tdelta)^2)))
+  return(Rt)
+}
+```
+
+
+```{r}
+Ovi<-data.frame(Temp=c(50,60,70,80,90,105),
+                Days=c(43,33,23,22,33,103))
+Ovi$Temp<-F2C(Ovi$Temp)
+```
+
+
+```{r}
+Data<-Ovi
+##### Taylor function set up. 
+TaylorFunction=function (Temp,par,k){
+  Rt= par[1]*exp(-.5*(((Temp-par[2])/par[3])^2))
+  -sum(dnorm(k,mean=Rt,sd=1,log=TRUE))
+}
+
+opt1=optim(fn=TaylorFunction,par=c(1,20,13),Temp=as.numeric(Data[,1]),k=(1/Data[,2]))
+print("Rmax")
+(Rmax1<-opt1$par[1])
+print("Tmax")
+(Tmax1<-opt1$par[2])
+print("Tdelta")
+(Tdelta1<-opt1$par[3])
+```
+
+```{r}
+FakeTemp<-seq(0,44,1)
+
+Rate<-Taylor_Plot(FakeTemp,Rmax1,Tmax1,Tdelta1)
+#print(cbind(FakeTemp,Rate))
+plot(FakeTemp,Rate,xlim=c(0,40),ylim=c(0,.4),main="Rate of Ovipostion",
+          xlab="Temp",cex.lab=1.5,cex=2.0,cex.axis=2.0) 
+lines(FakeTemp,Rate-(.25*Rate),lty=2)
+lines(FakeTemp,Rate+(.25*Rate),lty=2)
+points(Data[,1],1/Data[,2],col="red",pch=16)
+legend(0,0.3,legend=c("Modeled"),pch=c(1,16),col=c('black',"red"))
+```
+```{r}
+plot(FakeTemp,1/Rate,main="Duration of Oviposition",
+     xlab="Temp",ylab="Duration",ylim=c(0,100),cex.lab=1.5,cex=2.0,cex.axis=1.5) 
+points(Data[,1],Data[,2],col="red",pch=16)
+legend(1.0,100,legend=c("Modeled","Projected"),pch=c(1,16),col=c('black',"red"))
+```
+
+
+
+
+
+
+
+
+#### Egg Development
+
+From Miller and Keen 
+Egg development can not occur at temperatures below 50*
+
+Based on values in Miller and Keen (Pg 20)
+* At 60*F $^\circ$F 20 out of 59 eggs hatched in 16 days (40% in 16 days)
+* At 55*F $^\circ$F 14 out of 50 eggs hatched in 16 days (28% in 16 days)
+* At 53*F $^\circ$F 7 out of 50 eggs hatced in 16 days (14% in 16 days)
+* At and below 40 *F $^\circ$ F 0 of 50 eggs hatched in 21 days
+
+Opitimal temperatures in which incubation is completed in 7 days are probably between 70-90 degrees. 
+
+```{r}
+#Eggs<-data.frame(Temp=c(50,51,60,70,90,105),
+#                 Days=c(150,45,32,7,7,100))
+Eggs<-data.frame(Temp=c(50,70,80,90,105),
+                 Days=c(150,7,7,7,100))
+Eggs$Temp<-F2C(Eggs$Temp)
+                      
+```
+
+```{r}
+Data<-Eggs
+##### Taylor function set up. 
+TaylorFunction=function (Temp,par,k){
+  Rt= .1472*exp(-.5*(((Temp-par[1])/par[2])^2))
+  -sum(dnorm(k,mean=Rt,sd=1,log=TRUE))
+}
+
+opt1=optim(fn=TaylorFunction,par=c(20,5),Temp=as.numeric(Data[,1]),k=(1/Data[,2]))
+print("Rmax1")
+(Rmax1<-opt1$par[1])
+print("Tmax1")
+(Tmax1<-opt1$par[1])
+print("Tdelta1")
+(Tdelta1<-opt1$par[2])
+
+```
+
+```{r}
+1/7
+FakeTemp<-seq(0,44,1)
+Taylor_Plot(32,.1428571,Tmax1,Tdelta1)
+
+Rate<-Taylor_Plot(FakeTemp,.1428571,Tmax1,Tdelta1)
+#print(cbind(FakeTemp,Rate))
+plot(FakeTemp,Rate,xlim=c(0,40),ylim=c(0,.2),main="Rate of development of Eggs",
+          xlab="Temp",cex.lab=1.5,cex=2.0,cex.axis=2.0) 
+lines(FakeTemp,Rate/1-(.25*Rate/1))
+lines(FakeTemp,Rate+(.25*Rate))
+points(Data[,1],1/Data[,2],col="red",pch=16)
+legend(0,.3,legend=c("Modeled","Observed"),pch=c(1,16),col=c('black',"red"))
+
+```
+
+
+
+```{r}
+plot(FakeTemp,1/Rate,main="Duration of Egg Stage",
+     xlab="Temp",ylab="Duration",ylim=c(0,100),cex.lab=1.5,cex=2.0,cex.axis=1.5) 
+points(Data[,1],Data[,2],col="red",pch=16)
+legend(1.0,100,legend=c("Modeled","Observed"),pch=c(1,16),col=c('black',"red"))
+```
+
+
+
+# Larvae
+Miller and Keen 
+
+If we assume 7127 hour degrees from Saloman on pg 27
+
+Constant temperature of 95 or above is likely fatal.
+
+* Temperature	Hours	Days
+* 51	     7127  	  296.9583
+* 60	     712.7	  29.69583
+* 70	     356.35	  14.84792
+* 80	     237.5667	9.898611
+* 90	     178.175 	7.423958
+* 95	     158.3778	6.599074
+
+
+```{r cars}
+Larvae<-data.frame(Temp=c(51,60,80,90),
+                   Days=c(296.9,30,20.,20))
+
+#Larvae<-data.frame(Temp=c(51,60,70,80),
+#                   Days=c(296.9,29.7,14.8,9.9))
+
+
+Larvae$Temp<-F2C(Larvae$Temp)
+```
+
+```{r}
+Data<-Larvae
+1/20.0
+##### Taylor function set up. 
+TaylorFunction=function (Temp,par,k){
+  Rt= par[1]*exp(-.5*(((Temp-par[2])/par[3])^2))
+  -sum(dnorm(k,mean=Rt,sd=1,log=TRUE))
+}
+
+opt1=optim(fn=TaylorFunction,par=c(.3,23,13),Temp=as.numeric(Data[,1]),k=(1/Data[,2]))
+print("Rmax2")
+(Rmax2<-opt1$par[1])
+print("Tmax2")
+(Tmax2<-opt1$par[2])
+print("Tdelta2")
+(Tdelta2<-opt1$par[3])
+
+```
+
+```{r}
+FakeTemp<-seq(0,44,1)
+
+Rate<-Taylor_Plot(FakeTemp,.03,Tmax2,Tdelta2)
+1/Taylor_Plot(15.5,Rmax2,Tmax2,Tdelta2)
+#print(cbind(FakeTemp,Rate))
+plot(FakeTemp,Rate,xlim=c(0,40),ylim=c(0,.2),main="Rate of development of Larvae",
+          xlab="Temp",cex.lab=1.5,cex=2.0,cex.axis=2.0) 
+lines(FakeTemp,Rate/1-(.25*Rate/1))
+lines(FakeTemp,Rate+(.25*Rate))
+points(Data[,1],1/Data[,2],col="red",pch=16)
+legend(0,0.3,legend=c("Modeled","Observed"),pch=c(1,16),col=c('black',"red"))
+
+```
+
+
+```{r}
+plot(FakeTemp,1/Rate,main="Duration of Larval Stage",
+     xlab="Temp",ylab="Duration",ylim=c(0,100),cex.lab=1.5,cex=2.0,cex.axis=1.5) 
+points(Data[,1],Data[,2],col="red",pch=16)
+legend(1.0,100,legend=c("Modeled","Observed"),pch=c(1,16),col=c('black',"red"))
+```
+
+#### Try larvae 2
+
+```{r}
+Larvae<-data.frame(Temp=c(51,60,70,80),
+                   Days=c(296.9,29.7,14.8,9.9))
+
+
+Larvae$Temp<-F2C(Larvae$Temp)
+```
+
+```{r}
+Data<-Larvae
+##### Taylor function set up. 
+TaylorFunction=function (Temp,par,k){
+  Rt= par[1]*exp(-.5*(((Temp-par[2])/par[3])^2))
+  -sum(dnorm(k,mean=Rt,sd=1,log=TRUE))
+}
+
+opt1=optim(fn=TaylorFunction,par=c(1,23,13),Temp=as.numeric(Data[,1]),k=(1/Data[,2]))
+print("Rmax2")
+(Rmax2<-opt1$par[1])
+print("Tmax2")
+(Tmax2<-opt1$par[2])
+print("Tdelta2")
+(Tdelta2<-opt1$par[3])
+
+```
+
+```{r}
+FakeTemp<-seq(0,44,1)
+
+Rate<-Taylor_Plot(FakeTemp,Rmax2,Tmax2,Tdelta2)
+#print(cbind(FakeTemp,Rate))
+plot(FakeTemp,Rate,xlim=c(0,40),ylim=c(0,.4),main="Rate of development of Larvae",
+          xlab="Temp",cex.lab=1.5,cex=2.0,cex.axis=2.0) 
+lines(FakeTemp,Rate/1-(.25*Rate/1))
+lines(FakeTemp,Rate+(.25*Rate))
+points(Data[,1],1/Data[,2],col="red",pch=16)
+legend(0,0.3,legend=c("Modeled","Observed"),pch=c(1,16),col=c('black',"red"))
+
+```
+
+
+```{r}
+plot(FakeTemp,1/Rate,main="Duration of Larval Stage",
+     xlab="Temp",ylab="Duration",ylim=c(0,100),cex.lab=1.5,cex=2.0,cex.axis=1.5) 
+points(Data[,1],Data[,2],col="red",pch=16)
+legend(1.0,100,legend=c("Modeled","Observed"),pch=c(1,16),col=c('black',"red"))
+```
+
+#### Try larvae 2
+
+
+
+
+
+
+
+# Pre-pupal to Pupae
+
+From Miller and Keen  (Whiteside's experiment)
+
+* Degrees(F)	Average time Pre-pupal to pupae(days)
+* 74	2
+* 65	3
+* 60	4
+* 55	7
+
+Note: When mature larvae were exposed at 50* F a few pupae formed after 117 days
+
+```{r}
+Pre_pupal<-data.frame(Temp=c(50,55,60,65,74,105),
+                      Days=c(1000,1000,4,3,2,100))
+
+Pre_pupal$Temp<-F2C(Pre_pupal$Temp)
+```
+
+```{r pressure, echo=FALSE}
+Data<-Pre_pupal
+##### Taylor function set up. 
+TaylorFunction=function (Temp,par,k){
+  Rt= par[1]*exp(-.5*(((Temp-par[2])/par[3])^2))
+  -sum(dnorm(k,mean=Rt,sd=1,log=TRUE))
+}
+
+opt1=optim(fn=TaylorFunction,par=c(.5,27,6),Temp=as.numeric(Data[,1]),k=(1/Data[,2]))
+print("Rmax")
+(Rmax3<-opt1$par[1])
+print("Tmax")
+(Tmax3<-opt1$par[2])
+print("Tdelta")
+(Tdelta3<-opt1$par[3])
+```
+```{r}
+FakeTemp<-seq(0,40,1)
+
+Rate<-Taylor_Plot(FakeTemp,Rmax3,Tmax3,Tdelta3)
+Taylor_Plot(13,Rmax3,Tmax3,Tdelta3)
+#print(cbind(FakeTemp,Rate))
+
+plot(FakeTemp,Rate,xlim=c(0,40),ylim=c(0,1.0),main="Rate of development Pre-pupae to pupae",
+           xlab="Temp",cex.lab=1.5,cex=2.0,cex.axis=2.0) 
+lines(FakeTemp,Rate/1-(.25*Rate/1))
+lines(FakeTemp,Rate+(.25*Rate))
+points(Data[,1],1/Data[,2],col="red",pch=16)
+legend(0,1.0,legend=c("Modeled","Observed"),pch=c(1,16),col=c('black',"red"))
+```
+
+
+```{r}
+plot(FakeTemp,1/Rate,main="Duration of Pre-Pupae Stage",
+     xlab="Temp",ylab="Duration",ylim=c(0,20),cex.lab=1.5,cex=2.0,cex.axis=1.5) 
+points(Data[,1],Data[,2],col="red",pch=16)
+abline(v=12.5)
+
+legend(1.0,100,legend=c("Modeled","Observed"),pch=c(1,16),col=c('black',"red"))
+```
+
+
+
+Average time pupae to callow adult 
+From Miller and Keen Whiteside.
+
+* Degrees(F)	 (days)
+
+* 74	6
+* 65	6
+* 60	12
+* 55	24
+* 50	51
+
+
+```{r}
+Pupal<-data.frame(Temp=c(50,55,60,65,74),
+                      Days=c(51,24,12,6,6))
+Pupal$Temp<-F2C(Pupal$Temp)
+```
+
+```{r}
+Data<-Pupal
+##### Taylor function set up. 
+TaylorFunction=function (Temp,par,k){
+  Rt= par[1]*exp(-.5*(((Temp-par[2])/par[3])^2))
+  -sum(dnorm(k,mean=Rt,sd=.3,log=TRUE))
+}
+
+opt1=optim(fn=TaylorFunction,par=c(2.0,23,13),Temp=as.numeric(Data[,1]),k=(1/Data[,2]))
+print("Rmax")
+(Rmax4<-opt1$par[1])
+print("Tmax")
+(Tmax4<-opt1$par[2])
+print("Tdelta")
+(Tdelta4<-opt1$par[3])
+
+
+```
+
+
+
+
+```{r}
+FakeTemp<-seq(0,40,1)
+1/Taylor_Plot(20,Rmax4,Tmax4,Tdelta4)
+
+Rate<-Taylor_Plot(FakeTemp,Rmax4,Tmax4,Tdelta4)
+#print(cbind(FakeTemp,Rate))
+plot(FakeTemp,Rate,xlim=c(0,40),ylim=c(0,.4),main="Rate of development of pupae to callow adult",
+          xlab="Temp",cex.lab=1.5,cex=2.0,cex.axis=2.0) 
+lines(FakeTemp,Rate-(.25*Rate))
+lines(FakeTemp,Rate+(.25*Rate))
+points(Data[,1],1/Data[,2],col="red",pch=16)
+legend(0,0.2,legend=c("Modeled","Observed"),pch=c(1,16),col=c('black',"red"))
+```
+
+
+```{r}
+plot(FakeTemp,1/Rate,main="Duration of Pupae Stage",
+     xlab="Temp",ylab="Duration",ylim=c(0,100),cex.lab=1.5,cex=2.0,cex.axis=1.5) 
+points(Data[,1],Data[,2],col="red",pch=16)
+legend(1.0,100,legend=c("Modeled","Observed"),pch=c(1,16),col=c('black',"red"))
+```
+
+
+
+### Here is a standard value of 7 days for preemergence adult
+
+# I have no data on this. 
+From Miller and Keen
+
+"The adult event period of the time betwen the maturing of a beetle and its emregence averages 18.2 of overwintering generation and 7.1 days for the first generation."
+
+```{r}
+Pre_emergence<-14
+```
+
+
+
+```{r}
+Preflight<-data.frame(Temp=c(30,50,55,60,65,74,100),
+                      Days=c(18.2,18.2,18.2,18.2,18.2,18.2,18.2))
+Preflight$Temp<-F2C(Preflight$Temp)
+```
+
+
+```{r}
+1/18.2
+Data<-Preflight
+##### Taylor function set up. 
+TaylorFunction=function (Temp,par,k){
+  Rt= par[1]*exp(-.5*(((Temp-par[2])/par[3])^2))
+  -sum(dnorm(k,mean=Rt,sd=1,log=TRUE))
+}
+
+opt1=optim(fn=TaylorFunction,par=c(1,23,13),Temp=as.numeric(Data[,1]),k=(1/Data[,2]))
+print("Rmax")
+(Rmax5<-opt1$par[1])
+print("Tmax")
+(Tmax5<-opt1$par[2])
+print("Tdelta")
+(Tdelta5<-opt1$par[3])
+```
+
+```{r}
+FakeTemp<-seq(0,40,1)
+
+Rate<-Taylor_Plot(FakeTemp,Rmax5,Tmax5,Tdelta5)
+Taylor_Plot(0,Rmax5,Tmax5,Tdelta5)
+Taylor_Plot(10,Rmax5,Tmax5,Tdelta5)
+#print(cbind(FakeTemp,Rate))
+plot(FakeTemp,Rate,xlim=c(0,40),ylim=c(0,.1),main="Rate of development of Preflight Adults",
+          xlab="Temp",cex.lab=1.5,cex=2.0,cex.axis=2.0) 
+lines(FakeTemp,Rate/1-(.25*Rate/1))
+lines(FakeTemp,Rate+(.25*Rate))
+points(Data[,1],1/Data[,2],col="red",pch=16)
+legend(0,1.0,legend=c("Modeled","Observed"),pch=c(1,16),col=c('black',"red"))
+```
+
+
+```{r}
+plot(FakeTemp,1/Rate,main="Duration of Preemergence Stage",
+     xlab="Temp",ylab="Duration",ylim=c(0,100),cex.lab=1.5,cex=2.0,cex.axis=1.5) 
+points(Data[,1],Data[,2],col="red",pch= 16)
+legend(1.0,100,legend=c("Modeled","Observed"),pch=c(1,16),col=c('black',"red"))
+```
+
+Testing the model at a constant temperature throughtout the year.
+
+```{r}
+Temp=20
+Compile<-function(Temp){
+Rt1=1/ (Rmax1*exp(-.5*(((Temp-Tmax1)/Tdelta1)^2)))
+Rt2=1/(Rmax2*exp(-.5*(((Temp-Tmax2)/Tdelta2)^2)))
+Rt3=1/(Rmax3*exp(-.5*(((Temp-Tmax3)/Tdelta3)^2)))
+Rt4=1/(Rmax4*exp(-.5*(((Temp-Tmax4)/Tdelta4)^2)))
+
+Sum=sum(Rt1+Rt2+Rt3+Rt4+Pre_emergence)
+return(Sum)
+}
+```
+
+```{r}
+Temp1<-seq(0,50,1)
+df<-NULL
+for(i in Temp1){
+out<-Compile(i)
+df<-cbind(df,out)
+}
+
+plot(Temp1,df,ylim=c(0,200),main=min(df),xlab="Temperature  C",ylab="Days from ovipostion to flight")
+abline(h=min(df))
+
+```
+
+
+### Need to update this to contain all of the correct terms. Or transfer to python. 
+
+
+
+```{r}
+StartT=15
+ImapFuncNewJ = function(Tmin, Tmax, StartT, ReproductiveMortality,Initial){
+  #########################################################################################
+  # Components of the phenology model
+  #########################################################################################
+  
+  ## We need to compute the mean phloem temperature according to Bolstad, Bentz and Logan.
+  ## We compute mean phloem temperature by averaging maximum and minimum phloem temperature.
+  
+  # Here I use the average temperature differential (6.6)
+  Temp = 0.5*(Tmax + Tmin) + 0.9 + 6.6*(Tmax - Tmin)/(2*24.4)
+  #plot(Temp)
+  Tmax2 = Tmax + 6.6*(Tmax - Tmin)/24.4
+  Tmin2 = Tmin + 1.8
+  #print(Tmin2)
+  # The Taylor function for temperature dependent beetle development
+  TaylorFunc = function(TC,Rmax,Tmax,Tdelta){
+    
+    Y = 0.0
+    
+    if(TC >= 10 & TC <= 35){
+      Y=Rmax*(exp(-.5*(((TC-Tmax)/Tdelta)^2)))
+         
+    }
+    
+    if(Y <= 0.0) Y = 0.0
+    
+    return(Y)
+  }
+  
+  # the lognormal probability density function
+  LnormDist = function(x, mulog, sigmalog){
+    
+    y = 1/(x*sigmalog*sqrt(2*pi))*exp(-1/(2*sigmalog^2)*(log(x)-mulog)^2)
+    
+    return(y)
+  }
+  
+  # This function does a convolution of two variables of the same length
+  # but with padding on the right hand side
+  ConvolveFunc = function(x1, y1, padsize){
+    # padding
+    #x2 = c(rep(0,padsize), x1, rep(0,padsize))
+    #y2 = c(rep(0,padsize), y1, rep(0,padsize))
+    x2 = c(x1, rep(0,padsize))
+    y2 = c(y1, rep(0,padsize))
+    
+    # fast Fourier transforming
+    fx2 = fft(x2)
+    fy2 = fft(y2)
+    
+    # Doing the convolution and inverse transforming
+    Convolution1 = Re(fft(fx2*fy2, inverse = T)/length(x2))
+    
+    # Now clipping
+    #Convolution2 = Convolution1[(padsize+1):(length(x1)+padsize)]
+    Convolution2 = Convolution1[1:length(x1)]
+    
+    # This funky step adds in all of the individuals that have developed beyond the next
+    # threshold, but adds them in the last possible spot so that they do not effect
+    # the development distribution behind them.
+    Convolution2[length(x1)] = Convolution2[length(x1)] + 
+      sum(Convolution1[(length(x1)+1):length(x2)])
+    
+    return(Convolution2)
+  }
+  
+  # setting up the domain in physiological age
+  avec = seq(1e-20, 2, length.out = 2^8) # domain for the larval stage
+  da = avec[3] - avec[2]
+  
+  # Figuring out where in the domain avec = 1
+  # (upper breakpoint for egg stage)
+  # which.min(abs(avec - 1))
+  # avec[128]
+  # avec[129]
+  
+  # Defining all of the parameters
+  
+  # Defining the time step
+  # We will assume that the reaction rate is measured per day
+  # like the time step
+  deltat = 1.0 # units are days
+
+  # parameters for oviposition rate
+  # (from me)
+  Rmax0=0.040737
+  Tmax0=21.10148
+  Tdelta0=13.2611
+  sigma0=.3
+  # parameters for development rate for eggs
+  # (from Regniere et al 2012)
+  Rmax1=.1674279
+  Tmax1=25.64593
+  Tdelta1=6.181723
+  sigma1=.3
+  # parameters for development rate for Larvae
+  # (from Regniere et al 2012)
+  Rmax2=.1201419
+  Tmax2= 27.51329
+  Tdelta2= 5.935354
+  sigma2=.3
+  #parameters for dvelopment rate for Prepuae
+  Rmax3=.5346057
+  Tmax3= 26.5262
+  Tdelta3= 8.620681
+  sigma3=.3
+  # parameters for development rate for pupae
+  Rmax4=.1916731
+  Tmax4= 21.005
+  Tdelta4= 4.553309
+  sigma4=.3
+  # parameters for development rate for teneral adults
+  # (from Regniere et al 2012)
+  ###This is set as an even seven days
+  Rmax5=0.1456492
+  Tmax5= 95.377745
+  Tdelta5= 416.4147
+  sigma5=.3
+  # a container for predictions
+  
+  Fec = rep(0,length(Tmin))
+  Fec[1:StartT] = rep(Initial, StartT)
+  # containers for the other predictions
+  Eggs = rep(0,length(Tmin))
+  L1 = rep(0,length(Tmin))
+  L2 = rep(0,length(Tmin))
+  L3 = rep(0,length(Tmin))
+  L4 = rep(0,length(Tmin))
+  Pupae = rep(0,length(Tmin))
+  TenAd = rep(0,length(Tmin))
+  Adults = rep(0,length(Tmin))
+  #Flown = rep(0,length(Tmin))
+  Flying = rep(0,length(Tmin))
+  Flown = rep(0,length(Tmin))
+  ##########################################
+  # Initializing all of the stages 
+  ##########################################
+  # Initializing the old eggs
+  OldE = rep(0,length(avec))
+  OE = rep(0,length(avec))
+  NewEggstm1 = 0.0
+  
+  # Initializing the old L1 larvae
+  OldL1 = rep(0,length(avec))
+  OL1 = rep(0,length(avec))
+  NewL1tm1 = 0.0
+  # 
+  # # Initializing the old L2 larvae
+  # OldL2 = rep(0,length(avec))
+  # OL2 = rep(0,length(avec))
+  # NewL2tm1 = 0.0
+  # 
+  # # Initializing the old L3 larvae
+  # OldL3 = rep(0,length(avec))
+  # OL3 = rep(0,length(avec))
+  # NewL3tm1 = 0.0
+  # 
+  # # Initializing the old L4 larvae
+  # OldL4 = rep(0,length(avec))
+  # OL4 = rep(0,length(avec))
+  # NewL4tm1 = 0.0
+  
+  # Initializing the old pupae
+  OldP = rep(0,length(avec))
+  OP = rep(0,length(avec))
+  NewPtm1 = 0.0
+  
+  # Initializing the old teneral adults
+  OldT = rep(0,length(avec))
+  OT = rep(0,length(avec))
+  NewTtm1 = 0.0
+  
+  #################################################################################
+  # The integrated IMAP (Insect Mortality and Phenology) model
+  #################################################################################
+  
+for(i in (StartT+1):length(Tmin)){
+  # print(Temp)
+  
+  # Making an adjustment to minimum air temperature to account for the buffering
+  # effect of tree bark as described by Bolstad, Bentz, and Logan (1997)
+  Tmn = Tmin[i] + 1.8
+  
+  #############################################################
+  # The two step process for oviposition
+  #############################################################
+  
+  # Step 1: computing the development rate.
+  # Dvelopment for oviposition (Eggs increase)
+  
+  Y1 =  TaylorFunc(TC = Temp[i], Rmax0,Tmax0,Tdelta0)
+  
+  # Aplying winter mortality to egg laying adults
+  if(Tmn <= -12.2){
+    Fec[i-1] = 0.0
+  }
+  
+  # Step 2: Simulating oviposition 
+  # (Fec represents the number of eggs remaining)
+  Fec[i] = Fec[i-1]*exp(-Y1)
+  
+  ############################################################
+  # The six step process for egg development
+  ############################################################
+  
+  # Step 1: New eggs individuals that developed into eggs in this 
+  # time step are individuals that did not stay in the fecundity stage.
+  NewEggs = Fec[i-1]*(1 - exp(-Y1))
+  
+  # Step 2: computing the development rate.
+  # Develpment for eggs
+  Y2 = TaylorFunc(TC = Temp[i],  Rmax1,Tmax1,Tdelta1)
+  
+  # Step 3: To compute the number of new L1 larvae in the next stage,
+  # we need to know how many old Eggs there were 
+  # in the previous step. 
+  OldE = OE
+  
+  # From Miller and Keen
+  if(Tmn <=-23.30){
+    OldE = rep(0,length(avec))
+    NewEggstm1 = 0.0
+  }
+  
+  if(Y2 > 0.0){
+    # Step 4 computing the Fourier transform of the aging kernel
+    mu1 = log(Y2*deltat)
+    G1 = LnormDist(x = avec, mulog = mu1, sigmalog = sigma1)
+    G1 = G1/sum(G1)     # normalizing
+    
+    # Step 5: Doing the convolution
+    # Inverse Fourier transforming
+    OE = ConvolveFunc(x1 = OldE, y1 = G1, padsize = length(avec)) + NewEggstm1*G1
+    NewEggstm1 = NewEggs
+    
+    # Step 6: Computing how eggs there are
+    Eggs[i] = sum(na.omit(OE[1:128])) + NewEggs
+    
+  }else{
+    OE = OldE
+    NewEggstm1 = NewEggstm1 + NewEggs
+    Eggs[i] = sum(na.omit(OE[1:128])) + NewEggstm1
+  }
+  
+  ############################################################
+  # The six step process for Larvae
+  ############################################################
+  
+  # Step 1: New L1 individuals that developed into L1 larvae in this 
+  # time step are Egg individuals that exceeded the Egg breakpoint
+  OldLarv1 = sum(OldE[129:length(avec)], na.rm = T)
+  NewL1 = sum(OE[129:length(avec)], na.rm = T) - OldLarv1
+  
+  # Just to make sure that silly things don't happen
+  if(NewL1 < 0.0) NewL1 = 0.0
+  
+  # Step 2: computing the development rate for L1 larvae
+  Z2 = TaylorFunc(TC = Temp[i],  Rmax2,Tmax2,Tdelta2)
+  
+  # Step 3: To compute the number of new L2 larvae in the next stage, 
+  # we need to know how many old L1 larvae there were 
+  # in the previous step. 
+  OldL1 = OL1
+  if(Tmn <= -20.555){
+    OldL1 = rep(0,length(avec))
+    NewLt1m1 = 0.0
+  }
+  
+  if(Z2 > 0.0){
+    # Step 4: computing the Fourier transform of the aging kernel
+    mu2 = log(Z2*deltat)
+    G2 = LnormDist(x = avec, mulog = mu2, sigmalog = sigma2)
+    G2 = G2/sum(G2)     # normalizing
+    
+    # Step 5: Doing the convolution 
+    # Inverse Fourier tranforming
+    OL1 = ConvolveFunc(x1 = OldL1, y1 = G2, padsize = length(avec)) + NewL1tm1*G2
+    NewL1tm1 = NewL1
+    
+    # Step 6: Computing how many L1 larvae there are
+    L1[i] = sum(na.omit(OL1[1:128])) + NewL1
+  }else{
+    OL1 = OldL1
+    NewL1tm1 = NewL1tm1 + NewL1
+    
+    L1[i] = sum(na.omit(OL1[1:128])) + NewL1tm1
+  }
+  
+  
+  # 
+  ############################################################
+  # The six step process for Pupae
+  ############################################################
+  
+  # Step 1: New pupae that developed into pupae in this 
+  # time step are L4 individuals that exceeded the L4 breakpoint 
+  OldPup = sum(OldL1[129:length(avec)], na.rm = T)
+  NewP =sum(OL1[129:length(avec)], na.rm = T) - OldPup
+  
+  # Just to make sure that silly things don't happen
+  if(NewP < 0.0) NewP = 0.0
+  
+  # Step 2: computing the development rate for pupae
+  Z6 = TaylorFunc(TC = Temp[i],  Rmax4,Tmax4,Tdelta4)
+  
+  # Step 3: To compute the number of new teneral adults in the next stage, 
+  # we need to know how many Oldold and old Pupae there were 
+  # in the previous step. 
+  OldP = OP
+  
+  ##Miller and Keen 
+  if(Tmn <= -20.555){
+    OldP = rep(0,length(avec))
+    NewPtm1 = 0.0
+  }
+  
+  # Step 4: computing the Fourier transform of the aging kernel
+  if(Z6 > 0.0){
+    mu6 = log(Z6*deltat)
+    G6 = LnormDist(x = avec, mulog = mu6, sigmalog = sigma4)
+    G6 = G6/sum(G6)     # normalizing
+    
+    # Step 5: Doing the convolution
+    # Inverse Fourier transforming
+    OP = ConvolveFunc(x1 = OldP, y1 = G6, padsize = length(avec)) + NewPtm1*G6
+    NewPtm1 = NewP
+    
+    # Step 6: Tallying up pupae
+    Pupae[i] = sum(na.omit(OP[1:128])) + NewP
+  }else{
+    OP = OldP
+    NewPtm1 = NewPtm1 + NewP
+    Pupae[i] = sum(na.omit(OP[1:128])) + NewPtm1
+  }
+  
+  ############################################################
+  # The six step process for teneral adults
+  ############################################################
+  
+  # Step 1: New teneral adults that developed into tenerals in this 
+  # time step are pupae that exceeded the pupal breakpoint 
+  OldT = sum(OldP[129:length(avec)], na.rm = T)
+  NewT = sum(OP[129:length(avec)], na.rm = T) - OldT
+  
+  # Just to make sure that silly things don't happen
+  if(NewT < 0.0) NewT = 0.0
+  
+  # Step 2: computing the development rate for teneral adults
+  Z7 = TaylorFunc(TC = Temp[i], Rmax5,Tmax5,Tdelta5)
+  
+  # Step 3: To compute the number of new adults (Step 1.8), 
+  # we need to know the number of Oldold and old Teneral adults 
+  # in the previous step. 
+  OldT = OT 
+  
+  # Miller and Keen
+  if(Tmn <= -12.2){
+    OldT = rep(0,length(avec))
+    NewTtm1 = 0.0
+  }
+  
+  # Step 4: computing the Fourier transform of the aging kernel
+  if(Z7 > 0.0){
+    mu7 = log(Z7*deltat)
+    G7 = LnormDist(x = avec, mulog = mu7, sigmalog = sigma5)
+    G7 = G7/sum(G7)     # normalizing
+    
+    # Step 5: Doing the convolution
+    # Inverse Fourier transforming
+    OT = ConvolveFunc(x1 = OldT, y1 = G7, padsize = length(avec)) + NewTtm1*G7
+    NewTtm1 = NewT
+    
+    # Step 6: Tallying up teneral adults
+    TenAd[i] = sum(na.omit(OT[1:128])) + NewT
+  }else{
+    OT = OldT
+    NewTtm1 = NewTtm1 + NewT
+    TenAd[i] = sum(na.omit(OT[1:128])) + NewTtm1
+  }
+  
+  ############################################################
+  # The two step process for adults
+  ############################################################
+  
+  # Step 1: New adults that developed into adults in this 
+  # time step are teneral individuals that exceeded the teneral 
+  # breakpoint in this time step
+  OldAds = sum(OldT[129:length(avec)], na.rm = T)
+  NewA = sum(OT[129:length(avec)], na.rm = T) - OldAds
+  
+  # Just to make sure that silly things don't happen
+  if(NewA < 0.0) NewA = 0.0
+  
+  # To kill adult beetles, I use the -18 temperature used
+  # by Regniere et al 2015.
+  if(Tmn <= 5) Adults[i-1] = 0.0
+  
+  # Counting up adults
+  Adults[i] = Adults[i-1] + NewA
+  
+  Flying[i] = Flying[i-1]
+  
+  if(Temp[i] >= 19.0){
+    
+    Flying[i] = Flying[i-1]  + Adults[i-1]
+    
+    Adults[i]=NewA 
+    
+  }
+   Flown[i]=Flown[i-1]
+  if(Flying[i] >=10){
+    Flown[i]=Flying[i]+Flown[i-1]
+    #print('yes')
+    Fec[i]=40*Flying[i]*.5*(1-ReproductiveMortality)
+    Flying[i]=0
+  }
+ 
+  ##############################################
+  #Now all of the phenology has been simulated##
+  ##############################################
+  
+  # print(LifeCycleMat)
+}
+LifeCycleMat = matrix(c(Fec, Eggs, L1, Pupae, TenAd, Adults,Flying,Flown), 
+                        nrow = 8, ncol = length(Tmin), byrow = TRUE)
+LifeCycleMat<-LifeCycleMat[,c(1:length(Tmin))]
+return(LifeCycleMat)
+}
+```
+
+
+
+
+
+```{r,fig.width=10.0}
+# Now I will test the Imap function
+#Reading in some temperature data (in degrees C)
+
+library(RColorBrewer)
+#display.brewer.all()
+Dark2<-brewer.pal(8,"Dark2")
+
+#### Starts in On October 14
+Tmin = read.csv(paste0("C:/Users/345578/Desktop/Insect_Model/Sequoia-400-Plot1-Site1_Tmax.csv"), h = F)   # Min temp  
+Tmax = read.csv(paste0("C:/Users/345578/Desktop/Insect_Model/Sequoia-400-Plot1-Site1_Tmax.csv"), h = F)   # Max temp
+#Tmin<-rbind(Tmin,Tmin)
+#Tmax<-rbind(Tmax,Tmax)
+Tmin = as.numeric(Tmin$V1)
+#Tmin<-(Tmin+20)/2
+Tmax = as.numeric(Tmax$V1)
+#Tmax<-(Tmax+20)
+plot(Tmax,xaxt="n")
+axis.Date(1,at=seq(as.Date("1/1/10",tryFormats = c("%m/%d/%y")),as.Date("12/31/16",tryFormats = c("%m/%d/%y")),"months"),format="%m-%Y",cex.axis=1.5)
+plot(Tmax)
+
+#ptm <- proc.time()
+Out1 = ImapFuncNewJ(Tmin = Tmin, Tmax = Tmax, StartT = 1, ReproductiveMortality =.30,Initial = 1000.0)
+#proc.time() - ptm
+Out2<-t(Out1)
+
+Dates<-seq(as.Date("1/03/10",tryFormats = c("%m/%d/%y")),as.Date("12/31/18",tryFormats = c("%m/%d/%y")),"days")
+#print(Dates)
+
+plot(Out1[1,] ~ Dates, type = 'l',col=Dark2[1],ylim=c(0,2000),xaxt="n",cex=2.0,cex.lab=1.5,cex.axis=1.5,ylab="Population")
+axis.Date(1,at=seq(as.Date("1/03/10",tryFormats = c("%m/%d/%y")),as.Date("12/31/18",tryFormats = c("%m/%d/%y")),"months"),format="%m-%Y",cex.axis=.4)
+lines(Out1[2,] ~ Dates, lty = 2,col=Dark2[2])
+lines(Out1[3,] ~ Dates, lty = 3,col=Dark2[3])
+lines(Out1[4,] ~ Dates, lty = 1,col=Dark2[4])
+lines(Out1[5,] ~ Dates, lty = 1,col=Dark2[5])
+lines(Out1[6,] ~ Dates, lty = 1,col=Dark2[6])
+lines(Out1[7,] ~ Dates, lty = 2 ,col=Dark2[4])
+lines(Out1[8,] ~ Dates, lty = 3 ,col='black')
+legend(as.Date("10/15/09",tryFormats = c("%m/%d/%y")),2000,legend=c("Eggs to be layed","Eggs","Larvae","Puape", "Teneral Adults","Adults","Flight","Flown"),
+       lty=c(1,2,3,1,1,1,2,3),col=c(Dark2[1],Dark2[2],Dark2[3],Dark2[4],Dark2[5],Dark2[6],Dark2[4],Dark2[8]))
+
+#26280/8
+```
+
+
+
+```{r,fig.width=10.0}
+# Now I will test the Imap function
+#Reading in some temperature data (in degrees C)
+
+library(RColorBrewer)
+display.brewer.all()
+Dark2<-brewer.pal(8,"Dark2")
+
+#### Starts in On October 14
+Tmin = read.csv(paste0("C:/Users/345578/Desktop/Insect_Model/Sequoia-400-Plot1-Site1_Tmin.csv"), h = F)   # Min temp  
+Tmax = read.csv(paste0("C:/Users/345578/Desktop/Insect_Model/Sequoia-400-Plot1-Site1_Tmax.csv"), h = F)   # Max temp
+
+Tmin = as.numeric(Tmin$V1)
+#Tmin<-(Tmin+20)/2
+Tmax = as.numeric(Tmax$V1)
+#Tmax<-(Tmax+20)
+plot(Tmin)
+plot(Tmax)
+
+ptm <- proc.time()
+Out1 = ImapFuncNewJ(Tmin = Tmin, Tmax = Tmax, StartT = 15,ReproductiveMortality =.2 )
+proc.time() - ptm
+Out2<-t(Out1)
+
+Dates<-seq(as.Date("10/15/14",tryFormats = c("%m/%d/%y")),as.Date("1/1/16",tryFormats = c("%m/%d/%y")),"days")
+plot(Out1[1,] ~ Dates, type = 'l',col=Dark2[1],ylim=c(0,120),xaxt="n",cex=2.0,cex.lab=1.5,cex.axis=1.5,ylab="Population")
+axis.Date(1,at=seq(as.Date("10/15/14",tryFormats = c("%m/%d/%y")),as.Date("12/31/15",tryFormats = c("%m/%d/%y")),"months"),format="%m-%Y",cex.axis=1.5)
+lines(Out1[2,] ~ Dates, lty = 2,col=Dark2[2])
+lines(Out1[3,] ~ Dates, lty = 3,col=Dark2[3])
+lines(Out1[4,] ~ Dates, lty = 1,col=Dark2[4])
+lines(Out1[5,] ~ Dates, lty = 1,col=Dark2[5])
+lines(Out1[6,] ~ Dates, lty = 1,col=Dark2[6])
+lines(Out1[7,] ~ Dates, lty = 2 ,col=Dark2[4])
+legend(as.Date("10/15/14",tryFormats = c("%m/%d/%y")),120,legend=c("Eggs to be layed","Eggs","Larvae","Puape", "Teneral Adults","Adults","Flight"),
+       lty=c(1,2,3,1,1,1,2),col=c(Dark2[1],Dark2[2],Dark2[3],Dark2[4],Dark2[5],Dark2[6],Dark2[4]))
+
+
+
+
+?as.Date
+
+ptm <- proc.time()
+Out1 = ImapFuncNewJ(Tmin = Tmin, Tmax = Tmax, StartT = 250,Initial=100,ReproductiveMortality = .2)
+proc.time() - ptm
+Out2<-t(Out1)
+
+#Times = 1:443
+plot(Out1[1,] ~ Dates, type = 'l',col=Dark2[1],ylim=c(0,120),xaxt="n",cex=2.0,cex.lab=1.5,cex.axis=1.5,ylab="Population")
+axis.Date(1,at=seq(as.Date("10/15/14",tryFormats = c("%m/%d/%y")),as.Date("12/31/15",tryFormats = c("%m/%d/%y")),"months"),format="%m-%Y",cex.axis=1.5)
+lines(Out1[2,] ~ Dates, lty = 2,col=Dark2[2])
+lines(Out1[3,] ~ Dates, lty = 3,col=Dark2[3])
+lines(Out1[4,] ~ Dates, lty = 1,col=Dark2[4])
+lines(Out1[5,] ~ Dates, lty = 1,col=Dark2[5])
+lines(Out1[6,] ~ Dates, lty = 1,col=Dark2[6])
+lines(Out1[7,] ~ Dates, lty = 2 ,col=Dark2[4])
+legend(as.Date("10/15/14",tryFormats = c("%m/%d/%y")),120,legend=c("Eggs to be layed","Eggs","Larvae","Puape", "Teneral Adults","Adults","Flight"),
+       lty=c(1,2,3,1,1,1,2),col=c(Dark2[1],Dark2[2],Dark2[3],Dark2[4],Dark2[5],Dark2[6],Dark2[4]))
+
+ptm <- proc.time()
+Out1 = ImapFuncNewJ(Tmin = Tmin, Tmax = Tmax, StartT = 350,Initial=1000,ReproductiveMortality = .2)
+proc.time() - ptm
+Out2<-t(Out1)
+
+
+#(Fec, Eggs, L1, Pupae, TenAd, Adults,Flying)
+Times = 1:443
+plot(Out1[1,] ~ Dates, type = 'l',col=Dark2[1],ylim=c(0,120),xaxt="n",cex=2.0,cex.lab=1.5,cex.axis=1.5,ylab="Population")
+axis.Date(1,at=seq(as.Date("10/15/14",tryFormats = c("%m/%d/%y")),as.Date("12/31/15",tryFormats = c("%m/%d/%y")),"months"),format="%m-%Y",cex.axis=1.5)
+lines(Out1[2,] ~ Dates, lty = 2,col=Dark2[2])
+lines(Out1[3,] ~ Dates, lty = 3,col=Dark2[3])
+lines(Out1[4,] ~ Dates, lty = 1,col=Dark2[4])
+lines(Out1[5,] ~ Dates, lty = 1,col=Dark2[5])
+lines(Out1[6,] ~ Dates, lty = 1,col=Dark2[6])
+lines(Out1[7,] ~ Dates, lty = 2 ,col=Dark2[4])
+legend(as.Date("10/15/14",tryFormats = c("%m/%d/%y")),120,legend=c("Eggs to be layed","Eggs","Larvae","Puape", "Teneral Adults","Adults","Flight"),
+       lty=c(1,2,3,1,1,1,2),col=c(Dark2[1],Dark2[2],Dark2[3],Dark2[4],Dark2[5],Dark2[6],Dark2[4]))
+```
+
+
+
+```{r}
+# Now I will test the Imap function
+#Reading in some temperature data (in degrees C)
+
+#### Starts in On October 14
+Tmin = read.csv(paste0("C:/Users/345578/Desktop/Insect_Model/.csv"), h = F)   # Min temp  
+Tmax = read.csv(paste0("C:/Users/345578/Desktop/Insect_Model/Sequoia-400-Plot1-Site1_Tmax_2014.csv"), h = F)   # Max temp
+
+Tmin = as.numeric(Tmin$V1)
+#Tmin<-(Tmin+20)/2
+Tmax = as.numeric(Tmax$V1)
+#Tmax<-(Tmax+20)
+plot(Tmin)
+plot(Tmax)
+
+ptm <- proc.time()
+Out1 = ImapFuncNewJ(Tmin = Tmin, Tmax = Tmax, StartT = 15)
+proc.time() - ptm
+Out2<-t(Out1)
+
+
+Times = 1:443
+plot(Out1[1,] ~ Dates, type = 'l',col=Dark2[1],ylim=c(0,120),xaxt="n",cex=2.0,cex.lab=1.5,cex.axis=1.5,ylab="Population")
+axis.Date(1,at=seq(as.Date("10/15/14",tryFormats = c("%m/%d/%y")),as.Date("12/31/15",tryFormats = c("%m/%d/%y")),"months"),format="%m-%Y",cex.axis=1.5)
+lines(Out1[2,] ~ Dates, lty = 2,col=Dark2[2])
+lines(Out1[3,] ~ Dates, lty = 3,col=Dark2[3])
+lines(Out1[4,] ~ Dates, lty = 1,col=Dark2[4])
+lines(Out1[5,] ~ Dates, lty = 1,col=Dark2[5])
+lines(Out1[6,] ~ Dates, lty = 1,col=Dark2[6])
+legend(as.Date("10/15/14",tryFormats = c("%m/%d/%y")),120,legend=c("Eggs to be layed","Eggs","Larvae","Puape", "Teneral Adults","Adults"),
+       lty=c(1,2,3,1,1,1),col=c(Dark2[1],Dark2[2],Dark2[3],Dark2[4],Dark2[5],Dark2[6]))
+
+
+
+
+ptm <- proc.time()
+Out1 = ImapFuncNewJ(Tmin = Tmin, Tmax = Tmax, StartT = 300)
+proc.time() - ptm
+Out2<-t(Out1)
+
+plot(Out1[1,] ~ Dates, type = 'l',col=Dark2[1],ylim=c(0,120),xaxt="n",cex=2.0,cex.lab=1.5,cex.axis=1.5,ylab="Population")
+axis.Date(1,at=seq(as.Date("10/15/14",tryFormats = c("%m/%d/%y")),as.Date("12/31/15",tryFormats = c("%m/%d/%y")),"months"),format="%m-%Y",cex.axis=1.5)
+lines(Out1[2,] ~ Dates, lty = 2,col=Dark2[2])
+lines(Out1[3,] ~ Dates, lty = 3,col=Dark2[3])
+lines(Out1[4,] ~ Dates, lty = 1,col=Dark2[4])
+lines(Out1[5,] ~ Dates, lty = 1,col=Dark2[5])
+lines(Out1[6,] ~ Dates, lty = 1,col=Dark2[6])
+legend(as.Date("10/15/14",tryFormats = c("%m/%d/%y")),120,legend=c("Eggs to be layed","Eggs","Larvae","Puape", "Teneral Adults","Adults"),
+       lty=c(1,2,3,1,1,1),col=c(Dark2[1],Dark2[2],Dark2[3],Dark2[4],Dark2[5],Dark2[6]))
+ptm <- proc.time()
+Out1 = ImapFuncNewJ(Tmin = Tmin, Tmax = Tmax, StartT = 350)
+proc.time() - ptm
+Out2<-t(Out1)
+plot(Out1[1,] ~ Dates, type = 'l',col=Dark2[1],ylim=c(0,120),xaxt="n",cex=2.0,cex.lab=1.5,cex.axis=1.5,ylab="Population")
+axis.Date(1,at=seq(as.Date("10/15/14",tryFormats = c("%m/%d/%y")),as.Date("12/31/15",tryFormats = c("%m/%d/%y")),"months"),format="%m-%Y",cex.axis=1.5)
+lines(Out1[2,] ~ Dates, lty = 2,col=Dark2[2])
+lines(Out1[3,] ~ Dates, lty = 3,col=Dark2[3])
+lines(Out1[4,] ~ Dates, lty = 1,col=Dark2[4])
+lines(Out1[5,] ~ Dates, lty = 1,col=Dark2[5])
+lines(Out1[6,] ~ Dates, lty = 1,col=Dark2[6])
+legend(as.Date("10/15/14",tryFormats = c("%m/%d/%y")),120,legend=c("Eggs to be layed","Eggs","Larvae","Puape", "Teneral Adults","Adults"),
+       lty=c(1,2,3,1,1,1),col=c(Dark2[1],Dark2[2],Dark2[3],Dark2[4],Dark2[5],Dark2[6]))
+```
+

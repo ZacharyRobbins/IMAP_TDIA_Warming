@@ -1,0 +1,854 @@
+---
+title: "WPB Drought"
+author: "Zjrobbin"
+date: "6/12/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F)
+```
+
+
+
+```{r Setting up Data }
+
+## This file takes the ET and PPT and creates a delta. At this point I am not sure which measure we are using by the defualt now 
+## is to take a five year mean for ET and PPT and calculate the cumuluative((ET-PPT)-mean(ET5-PPT5))
+##Plotter
+library(RColorBrewer)
+library(rcarbon)
+library(RcppRoll)
+library(lubridate)
+ff<-function(x){
+  return(as.numeric(as.character(x)))
+}
+#display.brewer.all()
+Pal_1<-brewer.pal(9,"Set3")
+###REad ET 
+ET<-read.csv("C:/Users/zacha/Documents/GitHub/IMAP_Python_Project/WPB_Model/WPB_Inputs/WPB_ET_1_24.csv")
+colnames(ET)[2]<-"Dates"
+ET$Dates<-as.Date(ET$Dates,tryFormats = ("%Y-%m-%d"))
+
+
+## Set a date list so we have continous dates 
+Dates_Sub=data.frame(Dates=seq(as.Date("2001-01-01"),as.Date("2018-12-31"),1))
+Dates_Sub<-as.data.frame(Dates_Sub)
+Dates_Sub$Month<-month(Dates_Sub$Dates)
+Dates_Sub$Day<-day(Dates_Sub$Date)
+Dates_Sub$Year<-year(Dates_Sub$Dates)
+DatesNoLeap<-Dates_Sub[!(Dates_Sub$Month == 2 & Dates_Sub$Day == 29),]
+
+
+
+#### Spread ET on continous. 
+Continous<-merge(DatesNoLeap,ET,by="Dates",all.x=TRUE)
+Continous<-Continous[,c(-2,-3,-4)]
+Continous$Low_LowElShape_Out<-ff(Continous$Low_LowElShape_Out)
+Continous$Low_MedElShape_Out<-ff(Continous$Low_MedElShape_Out)
+Continous$Low_HighElShape_Out<-ff(Continous$Low_HighElShape_Out)
+Continous$High_LowElShape_Out<-ff(Continous$High_LowElShape_Out)
+Continous$High_MedElShape_Out<-ff(Continous$High_MedElShape_Out)  
+Continous$High_HighElShape_Out<-ff(Continous$High_HighElShape_Out)  
+Continous[is.na(Continous)]<-0.0
+Continous<-Continous[,-2]
+#boxplot(Continous[-1])
+
+
+
+
+Dates=data.frame(Dates=seq(as.Date("2001-01-01"),as.Date("2018-01-01"),1))
+# This is a function to smooth the 8 day measurement across the 8 days
+RunET<-runMean(ET,n=8)
+
+PPT_in<-read.csv("C:/Users/zacha/Documents/GitHub/IMAP_Python_Project/WPB_Model/WPB_Inputs/WPB_Prcp_1_14.csv")
+colnames(PPT_in)<-c(paste0(colnames(PPT_in),"PRCP"))
+colnames(PPT_in)[2]<-"Dates"
+PPT_in<-PPT_in[-1]
+PPT_in$Dates<-as.Date(PPT_in$Dates)
+
+Dates<-as.Date(seq(
+  from=as.POSIXct("1997-01-01 0:00", tz="UTC"),
+  to=as.POSIXct("2018-01-01 0:00", tz="UTC"),
+  by="day"
+) )
+
+
+
+PPT_sub<-PPT_in[PPT_in$Dates %in% as.Date(Dates),]
+### Merge the dates 
+Delta_df<-merge(Continous,PPT_sub,by="Dates",all.x=TRUE)
+
+### Look at the difference between ppt and et for each day. 
+Delta_df$Low_LowElDelta<-Delta_df$Low_LowElShape_OutPRCP-Delta_df$Low_LowElShape_Out
+Delta_df$Low_LowElDelta[is.na(Delta_df$Low_LowElDelta)]<-0
+#Delta_df$Low_LowElDelta[is.na(Delta_df$Low_LowElDelta)]
+Delta_df$Low_MedElDelta<-Delta_df$Low_MedElShape_OutPRCP-Delta_df$Low_MedElShape_Out
+Delta_df$Low_MedElDelta[is.na(Delta_df$Low_MedElDelta)]<-0
+Delta_df$Low_HighElDelta<-Delta_df$Low_HighElShape_OutPRCP-Delta_df$Low_HighElShape_Out
+Delta_df$Low_HighElDelta[is.na(Delta_df$Low_HighElDelta)]<-0
+Delta_df$High_LowElDelta<-Delta_df$High_LowElShape_OutPRCP-Delta_df$High_LowElShape_Out
+Delta_df$High_LowElDelta[is.na(Delta_df$High_LowElDelta)]<-0
+Delta_df$High_MedElDelta<-Delta_df$High_MedElShape_OutPRCP-Delta_df$High_MedElShape_Out
+Delta_df$High_MedElDelta[is.na(Delta_df$High_MedElDelta)]<-0
+Delta_df$High_HighElDelta<-Delta_df$High_HighElShape_OutPRCP-Delta_df$High_HighElShape_Out
+Delta_df$High_HighElDelta[is.na(Delta_df$High_HighElDelta)]<-0
+
+Dates_2<-as.Date(seq(
+  from=as.POSIXct("2001-01-01 0:00", tz="UTC"),
+  to=as.POSIXct("2006-01-01 0:00", tz="UTC"),
+  by="day"
+) )
+
+Delta_df_sub<-Delta_df[Delta_df$Dates %in% Dates_2,]
+Deltas<-Delta_df_sub[,c(14:19)]
+colMeans(Deltas)
+
+plot(Delta_df$Low_LowElShape_OutPRCP)
+plot(Delta_df$Low_LowElShape_Out)
+plot(Delta_df$Low_MedElDelta)
+
+Mortality<-read.csv("C:/Users/zacha/Documents/GitHub/IMAP_Python_Project/WPB_Model/WPB_Inputs/WPBPercentMortality.csv")
+Mortality<-Mortality[,-1]
+Mortality<-Mortality[-17,]
+colnames(Mortality)<-c("Year","AllPerc","SmallPerc","LargePerc")
+Mortality$Dates<-seq(as.Date("2003-07-02"),as.Date("2018-07-02"),by="year")
+Mortality<-Mortality[Mortality$Year %in% seq(2008,2017),]
+
+
+```
+
+
+
+
+```{r,fig.width=20.0,fig.height=10.0}
+together<-cbind(as.Date(as.character(Delta_df$Dates)),Delta_df$Low_MedElDelta)
+colnames(together)<-c("Dates","Two")
+Merged<-merge(together,Mortality,all.x=T,by="Dates")
+Merged<-Merged[Merged$Dates>as.Date("2005-01-01"),]
+print(Merged)
+
+par(mar=c(5,5,1,1))
+plot(as.Date(together[1460:nrow(together),1]),roll_sum(Delta_df$Low_LowElDelta-mean(Delta_df_sub$Low_LowElDelta),1460),col=Pal_1[1],ylim=c(-1010,1000),
+     ylab="Drought Index",xlab="Year",cex.axis=1.6,cex.lab=1.6,type="l",lwd=3.0,main="Drought Index WPB Study Sites")
+#points(as.Date(together[,1]),cumsum(Delta_df$Low_MedElDelta-mean(Delta_df_sub$Low_MedElDelta))/19)
+points(as.Date(together[1460:nrow(together),1]),roll_sum(Delta_df$Low_MedElDelta-mean(Delta_df_sub$Low_MedElDelta),1460))
+points(as.Date(together[1460:nrow(together),1]),roll_sum(Delta_df$High_LowElDelta-mean(Delta_df_sub$High_LowElDelta),1460),col=Pal_1[3],type="l",lwd=3.0)
+#points(as.Date(together[,1]),cumsum(Delta_df$High_MedElDelta-mean(Delta_df_sub$High_MedElDelta))/19,col=Pal_1[4])
+points(as.Date(together[1460:nrow(together),1]),roll_sum(Delta_df$High_HighElDelta-mean(Delta_df_sub$High_HighElDelta),1460),col=Pal_1[4],type="l",lwd=3.0)
+abline(h=-50)
+legend(as.Date(together[1460,1]),-50,legend=c("Low Elevation/Low Lat","High Elevation/Low Lat","Low Elevation/High Lat","High Elevation/High Lat"),
+       pch=c(16,16,16,16),col=c(Pal_1[1],Pal_1[5],Pal_1[3],Pal_1[4]),cex=1.5)
+par(new = T)
+with(d=Merged, plot(as.Date(Merged$Dates),-Merged$LargePerc*100, 
+                       pch=16, axes=F, ylim=c(-50,0),xlab=NA, 
+                       ylab=NA, cex=2.0))
+  axis(side = 4,font.axis=2,font.lab=2,cex.lab=2.0,cex.axis=2.0)
+  mtext(side = 4, line = 3,cex=2.0, '-Percent Mortality')
+par(xpd = T)
+legend(as.Date("2020-09-01"),-20,legend=c("Low Elevation/Low Lat","High Elevation/Low Lat",
+                                              "Low Elevation/High Lat","High Elevation/High Lat",
+                                              "Beetle Mortality %","July of a given Year"),
+         pch=c(16,16,16,16,16,NA),lty=c(NA,NA,NA,NA,NA,1),col=c(Pal_1[1],Pal_1[3],Pal_1[4],Pal_1[5],"black","black"),
+         cex=2.0)
+```
+
+
+```{r,fig.width=20.0,fig.height=10.0}
+Drought_Output<-data.frame(Dates=as.Date(together[1460:nrow(together),1]),
+                           LE_LL=roll_sum(Delta_df$Low_LowElDelta-mean(Delta_df_sub$Low_LowElDelta),1460),
+                           LE_HL=roll_sum(Delta_df$Low_MedElDelta-mean(Delta_df_sub$Low_MedElDelta),1460),
+                           HE_LL=roll_sum(Delta_df$High_LowElDelta-mean(Delta_df_sub$High_LowElDelta),1460),
+                           HE_HL=roll_sum(Delta_df$High_MedElDelta-mean(Delta_df_sub$High_MedElDelta),1460))
+FullDates<-data.frame(Dates=seq(from=as.Date("2001-01-01"),to=as.Date("2018-12-31"),"day"))
+colnames(FullDates)<-"Dates"
+Fulloutput<-merge(FullDates,Drought_Output,by="Dates",all.x=T)
+Fulloutput[is.na(Fulloutput)]<-0
+#colnames(Drought_Output)<-c("Dates","Low_LowElDelta","Low_MedElDelta","Low_HighElDelta",
+#                            "High_LowElDelta","High_MedElDelta","High_HighElDelta")
+
+#write.csv(Fulloutput,"C:/Users/zacha/Documents/GitHub/IMAP_Python_Project/WPB_Model/WPB_Inputs/WPB_New_ET_4.csv")
+```
+
+```{r,fig.width=20.0,fig.height=10.0}
+together<-cbind(as.character(Delta_df$Dates),Delta_df$Low_MedElDelta)
+par(mar=c(5,5,1,1))
+plot(as.Date(together[1460:nrow(together),1]),roll_sum(Delta_df$Low_LowElDelta,1460),col=Pal_1[1],ylim=c(-1010,2000),
+     ylab="Drought Index",xlab="Year",cex.axis=1.6,cex.lab=1.6,type="l",lwd=3.0,main="Drought Index WPB Study Sites")
+#points(as.Date(together[,1]),cumsum(Delta_df$Low_MedElDelta-mean(Delta_df_sub$Low_MedElDelta))/19)
+points(as.Date(together[1460:nrow(together),1]),roll_sum(Delta_df$Low_MedElDelta,1460))
+points(as.Date(together[1460:nrow(together),1]),roll_sum(Delta_df$High_LowElDelta,1460),col=Pal_1[3],type="l",lwd=3.0)
+#points(as.Date(together[,1]),cumsum(Delta_df$High_MedElDelta-mean(Delta_df_sub$High_MedElDelta))/19,col=Pal_1[4])
+points(as.Date(together[1460:nrow(together),1]),roll_sum(Delta_df$High_HighElDelta,1460),col=Pal_1[4],type="l",lwd=3.0)
+abline(h=-50)
+legend(as.Date(together[1,1]),-50,legend=c("Low Elevation/Low Lat","High Elevation/Low Lat","Low Elevation/High Lat","High Elevation/High Lat"),
+       pch=c(16,16,16,16),col=c(Pal_1[1],Pal_1[5],Pal_1[3],Pal_1[4]),cex=1.5)
+```
+
+```{r}
+par(mar=c(5,5,5,33),xpd=F)
+plot(as.Date(m3$Dates),m3$HE_HL_pal,
+     col=adjustcolor(Pal_1[5],alpha.f=.5),ylim=c(-5,6),
+     ylab="Drought Index",xlab="Year",cex.axis=2.0,cex.lab=2.0,cex.main=2.0,type="l",lwd=3.0,
+     main="Palmers Drought Index Study Sites")
+#points(as.Date(together[,1]),cumsum(Delta_df$Low_MedElDelta-mean(Delta_df_sub$Low_MedElDelta))/19)
+points(as.Date(m3$Dates),m3$HE_LL_pal,
+       col=adjustcolor(Pal_1[3],alpha.f=.5),type="l",lwd=3.0)
+points(as.Date(m3$Dates),m3$LE_HL_pal,
+       col=adjustcolor(Pal_1[4],alpha.f=.5),type="l",lwd=3.0)
+#points(as.Date(together[,1]),cumsum(Delta_df$High_MedElDelta-mean(Delta_df_sub$High_MedElDelta))/19,col=Pal_1[4])
+points(as.Date(m3$Dates),m3$LE_LL_pal,
+       col=adjustcolor(Pal_1[1],alpha.f=.5),type="l",lwd=3.0)
+abline(h=0)
+abline(v=as.Date("2013-07-01"),lty=2.0)
+abline(v=as.Date("2014-07-01"),lty=3.0)
+abline(v=as.Date("2015-07-01"),lty=4.0)
+abline(v=as.Date("2016-07-01"),lty=5.0)
+par(new = T)
+with(d=Merged, plot(as.Date(Merged$Dates),-Merged$LargePerc*100, 
+                       pch=16, axes=F, ylim=c(-50,0),xlab=NA, 
+                       ylab=NA, cex=2.0))
+  axis(side = 4,font.axis=2,font.lab=2,cex.lab=2.0,cex.axis=2.0)
+  mtext(side = 4, line = 3,cex=2.0, '-Percent Mortality')
+par(xpd = T)
+legend(as.Date("2020-09-01"),-20,legend=c("Low Elevation/Low Lat","High Elevation/Low Lat",
+                                              "Low Elevation/High Lat","High Elevation/High Lat",
+                                              "Beetle Mortality %","July of a given Year"),
+         pch=c(16,16,16,16,16,NA),lty=c(NA,NA,NA,NA,NA,1),col=c(Pal_1[1],Pal_1[3],Pal_1[4],Pal_1[5],"black","black"),
+         cex=2.0)
+Dates<-data.frame(Dates=seq(as.Date("2003-01-01"),as.Date("2018-01-01"),by="day"))
+library(dplyr)
+library(zoo)
+M4<-merge(Dates,m3,by="Dates",all.x=T)
+
+#### Linear interpolation
+
+
+Interpol<-data.frame(Dates=seq(M4$Dates[1],M4$Dates[nrow(M4)],by=1))%>%
+  full_join(M4,by="Dates")%>%
+  mutate(HE_HL=na.approx(HE_HL_pal),HE_LL=na.approx(HE_LL_pal),
+         LE_HL=na.approx(LE_HL_pal),LE_LL=na.approx(LE_LL_pal))
+Interpol<-Interpol[,c(-2,-3,-4,-5)]
+```
+
+
+
+```{r}
+
+
+Delta_df_sub<-Delta_df[Delta_df$Dates %in% Dates_2,]
+Deltas<-Delta_df_sub[,c(14:19)]
+
+
+plot(Delta_df$Low_LowElShape_OutPRCP)
+plot(Delta_df$Low_LowElShape_Out)
+plot(Delta_df$Low_MedElDelta)
+```
+
+
+### Palmers Drought Severity Index 
+
+https://developers.google.com/earth-engine/datasets/catalog/IDAHO_EPSCOR_PDSI
+
+This is from the same group that produced MACA they have Palmers drought severity index going back ot 1979 on a thrice
+monthly timestep (1,10,20th)
+From the description 
+
+"The Palmer Drought Severity Index dataset provides high spatial resolution (~4-km) thrice-monthly estimates of this widely used measure of integrated water supply and demand anomalies across the contiguous United States from 1979-present. The PDSI is calculated using precipitation and potential evapotranspiration derived from the gridded meteorological dataset of Abatzoglou (2013).
+
+Potential evapotranspiration is computed using the Penman-Montieth equation for a reference grass surface. Available soil water holding capacity in the top 2.5m of the soil was derived from the STATSGO soils database and used in the computations. Whereas PDSI has typically been computed on monthly timescales, we compute these data three-times a month to provide more timely updates. Due to the spin-up of PDSI calculations, data for the first year of record should be used sparingly.
+
+This dataset contains provisional products that are replaced with updated versions when the complete source data become available. Products can be distinguished by the value of the 'status' property. At first, assets are ingested with status='early'. After several days, they are replaced by assets with status='provisional'. After about 2 months, they are replaced by the final assets with status='permanent'."
+
+I took the average bounded by the shape file for each of the WPB Locations 
+
+
+
+```{r,fig.width=20.0,fig.height=10.0}
+
+HE_HL_pal<-read.csv("C:/Users/zacha/Desktop/WPB_Palmers/WPB_Palmers/HE_HL_WPB_Table.csv")
+colnames(HE_HL_pal)<-c("Dates","HE_HL_pal")
+HE_LL_pal<-read.csv("C:/Users/zacha/Desktop/WPB_Palmers/WPB_Palmers/HE_LL_WPB_Table.csv")
+colnames(HE_LL_pal)<-c("Dates","HE_LL_pal")
+LE_HL_pal<-read.csv("C:/Users/zacha/Desktop/WPB_Palmers/WPB_Palmers/LE_HL_WPB_Table.csv")
+colnames(LE_HL_pal)<-c("Dates","LE_HL_pal")
+LE_LL_pal<-read.csv("C:/Users/zacha/Desktop/WPB_Palmers/WPB_Palmers/LE_LL_WPB_Table.csv")
+colnames(LE_LL_pal)<-c("Dates","LE_LL_pal")
+m1<-merge(HE_HL_pal,HE_LL_pal,by="Dates",all.x=T)
+m2<-merge(m1,LE_HL_pal,by="Dates",all.x=T)
+m3<-merge(m2,LE_LL_pal,by="Dates",all.x=T)
+
+
+Mortality<-read.csv("C:/Users/zacha/Documents/GitHub/IMAP_Python_Project/WPB_Model/WPB_Inputs/WPBPercentMortality.csv")
+Mortality<-Mortality[,-1]
+Mortality<-Mortality[-17,]
+colnames(Mortality)<-c("Year","AllPerc","SmallPerc","LargePerc")
+Mortality$Dates<-seq(as.Date("2003-07-10"),as.Date("2018-07-10"),by="year")
+Mortality<-Mortality[Mortality$Year %in% seq(2008,2017),]
+
+m3$Dates<-as.Date(m3$Dates)
+m3<-m3[order(m3$Dates),]
+Merged<-merge(m3,Mortality,all.x=T,by="Dates")
+Merged<-Merged[Merged$Dates>"2003-01-01",]
+par(mar=c(5,5,5,33),xpd=F)
+plot(as.Date(m3$Dates),m3$HE_HL_pal,
+     col=adjustcolor(Pal_1[5],alpha.f=.5),ylim=c(-5,6),
+     ylab="Drought Index",xlab="Year",cex.axis=2.0,cex.lab=2.0,cex.main=2.0,type="l",lwd=3.0,
+     main="Palmers Drought Index Study Sites")
+
+
+#points(as.Date(together[,1]),cumsum(Delta_df$Low_MedElDelta-mean(Delta_df_sub$Low_MedElDelta))/19)
+points(as.Date(m3$Dates),m3$HE_LL_pal,
+       col=adjustcolor(Pal_1[3],alpha.f=.5),type="l",lwd=3.0)
+points(as.Date(m3$Dates),m3$LE_HL_pal,
+       col=adjustcolor(Pal_1[4],alpha.f=.5),type="l",lwd=3.0)
+#points(as.Date(together[,1]),cumsum(Delta_df$High_MedElDelta-mean(Delta_df_sub$High_MedElDelta))/19,col=Pal_1[4])
+points(as.Date(m3$Dates),m3$LE_LL_pal,
+       col=adjustcolor(Pal_1[1],alpha.f=.5),type="l",lwd=3.0)
+abline(h=0)
+abline(v=as.Date("2013-07-01"),lty=2.0)
+abline(v=as.Date("2014-07-01"),lty=3.0)
+abline(v=as.Date("2015-07-01"),lty=4.0)
+abline(v=as.Date("2016-07-01"),lty=5.0)
+par(new = T)
+with(d=Merged, plot(as.Date(Merged$Dates),-Merged$LargePerc*100, 
+                       pch=16, axes=F, ylim=c(-50,0),xlab=NA, 
+                       ylab=NA, cex=2.0))
+  axis(side = 4,font.axis=2,font.lab=2,cex.lab=2.0,cex.axis=2.0)
+  mtext(side = 4, line = 3,cex=2.0, '-Percent Mortality')
+par(xpd = T)
+legend(as.Date("2020-09-01"),-20,legend=c("Low Elevation/Low Lat","High Elevation/Low Lat",
+                                              "Low Elevation/High Lat","High Elevation/High Lat",
+                                              "Beetle Mortality %","July of a given Year"),
+         pch=c(16,16,16,16,16,NA),lty=c(NA,NA,NA,NA,NA,1),col=c(Pal_1[1],Pal_1[3],Pal_1[4],Pal_1[5],"black","black"),
+         cex=2.0)
+Dates<-data.frame(Dates=seq(as.Date("2003-01-01"),as.Date("2018-01-01"),by="day"))
+library(dplyr)
+library(zoo)
+M4<-merge(Dates,m3,by="Dates",all.x=T)
+
+#### Linear interpolation
+
+
+Interpol<-data.frame(Dates=seq(M4$Dates[1],M4$Dates[nrow(M4)],by=1))%>%
+  full_join(M4,by="Dates")%>%
+  mutate(HE_HL=na.approx(HE_HL_pal),HE_LL=na.approx(HE_LL_pal),
+         LE_HL=na.approx(LE_HL_pal),LE_LL=na.approx(LE_LL_pal))
+Interpol<-Interpol[,c(-2,-3,-4,-5)]
+
+write.csv(m3,"C:/Users/zacha/Documents/GitHub/IMAP_Python_Project/WPB_Model/WPB_Inputs/WPB_Palmers.csv")
+```
+
+
+### Interpolated Palmers
+
+```{r,fig.width=20.0,fig.height=10.0}
+
+par(mar=c(5,5,5,33),xpd=F)
+plot(as.Date(Interpol$Dates),Interpol$HE_HL,
+     col=adjustcolor(Pal_1[5],alpha.f=.5),ylim=c(-5,6),
+     ylab="Drought Index",xlab="Year",cex.axis=2.0,cex.lab=2.0,cex.main=2.0,type="l",lwd=3.0,
+     main="Palmers Drought Index Study Sites")
+
+
+#points(as.Date(together[,1]),cumsum(Delta_df$Low_MedElDelta-mean(Delta_df_sub$Low_MedElDelta))/19)
+points(as.Date(Interpol$Dates),Interpol$HE_LL,
+       col=adjustcolor(Pal_1[3],alpha.f=.5),type="l",lwd=3.0)
+points(as.Date(Interpol$Dates),Interpol$LE_HL,
+       col=adjustcolor(Pal_1[4],alpha.f=.5),type="l",lwd=3.0)
+#points(as.Date(together[,1]),cumsum(Delta_df$High_MedElDelta-mean(Delta_df_sub$High_MedElDelta))/19,col=Pal_1[4])
+points(as.Date(Interpol$Dates),Interpol$LE_LL,
+       col=adjustcolor(Pal_1[1],alpha.f=.5),type="l",lwd=3.0)
+abline(h=0)
+abline(v=as.Date("2013-07-01"),lty=2.0)
+abline(v=as.Date("2014-07-01"),lty=3.0)
+abline(v=as.Date("2015-07-01"),lty=4.0)
+abline(v=as.Date("2016-07-01"),lty=5.0)
+par(new = T)
+with(d=Merged, plot(as.Date(Merged$Dates),-Merged$LargePerc*100, 
+                       pch=16, axes=F, ylim=c(-50,0),xlab=NA, 
+                       ylab=NA, cex=2.0))
+  axis(side = 4,font.axis=2,font.lab=2,cex.lab=2.0,cex.axis=2.0)
+  mtext(side = 4, line = 3,cex=2.0, '-Percent Mortality')
+par(xpd = T)
+legend(as.Date("2020-09-01"),-20,legend=c("Low Elevation/Low Lat","High Elevation/Low Lat",
+                                              "Low Elevation/High Lat","High Elevation/High Lat",
+                                              "Beetle Mortality %","July of a given Year"),
+         pch=c(16,16,16,16,16,NA),lty=c(NA,NA,NA,NA,NA,1),col=c(Pal_1[1],Pal_1[3],Pal_1[4],Pal_1[5],"black","black"),
+         cex=2.0)
+
+write.csv(Interpol,"C:/Users/zacha/Documents/GitHub/IMAP_Python_Project/WPB_Model/WPB_Inputs/WPB_Palmers.csv")
+```
+
+
+
+
+## SPI (Four Year)
+Standardize precipitation index is $\frac{Precip-Mean Hist Precip}{(SD of Hist Precip)}$
+
+From Gavin D. Madakumbura and Michael L. Goulden's manuscript. They tested several drought indices for the area and settled on 
+a 4 year lg SPI. This only takes precip as an input. 
+
+```{r,fig.width=20.0,fig.height=10.0}
+PPT_in<-read.csv("C:/Users/zacha/Documents/GitHub/IMAP_Python_Project/WPB_Model/WPB_Inputs/WPB_Prcp_1_14.csv")
+colnames(PPT_in)<-c(paste0(colnames(PPT_in),"PRCP"))
+colnames(PPT_in)[2]<-"Dates"
+PPT_in<-PPT_in[-1]
+PPT_in$Dates<-as.Date(PPT_in$Dates)
+
+Dates<-as.Date(seq(
+  from=as.POSIXct("1999-01-01 0:00", tz="UTC"),
+  to=as.POSIXct("2018-01-01 0:00", tz="UTC"),
+  by="day"
+) )
+
+
+
+Dates2<-as.Date(seq(
+  from=as.POSIXct("1995-01-01 0:00", tz="UTC"),
+  to=as.POSIXct("2005-01-01 0:00", tz="UTC"),
+  by="day"
+) )## Was 2012
+
+PPT_sub<-PPT_in[PPT_in$Dates %in% as.Date(Dates2),]
+PPT_sub<-PPT_sub[order(PPT_sub$Dates),]
+LE_LL_Roll<-roll_sum(PPT_sub$Low_LowElShape_OutPRCP,1460)
+LE_LL_Mean<-mean(LE_LL_Roll)
+LE_LL_SD<-sd(LE_LL_Roll)
+ME_LL_Roll<-roll_sum(PPT_sub$Low_MedElShape_OutPRCP,1460)
+ME_LL_Mean<-mean(ME_LL_Roll)
+ME_LL_SD<-sd(ME_LL_Roll)     
+LE_HL_Roll<-roll_sum(PPT_sub$High_LowElShape_OutPRCP,1460)
+LE_HL_Mean<-mean(LE_HL_Roll)
+LE_HL_SD<-sd(LE_HL_Roll)
+HE_HL_Roll<-roll_sum(PPT_sub$High_MedElShape_OutPRCP,1460)
+HE_HL_Mean<-mean(HE_HL_Roll)
+HE_HL_SD<-sd(HE_HL_Roll)
+
+Delta_Shorter<-Delta_df[Delta_df$Dates>"2008-07-01",]
+Merged<-merge(Delta_Shorter,Mortality,all.x=T,by="Dates")
+
+PPT<-PPT_in[PPT_in$Dates %in% as.Date(Dates),]
+PPT<-PPT[PPT$Dates>"1999-01-01",]
+PPT<-PPT[order(PPT$Dates),]
+
+#plot(as.Date(Dates)[1460:6206],(roll_sum(PPT$Low_LowElShape_OutPRCP,1460)-LE_LL_Mean)/LE_LL_SD)
+par(mar=c(5,5,5,33),xpd=F)
+plot(as.Date(PPT$Dates)[1460:6935],(roll_sum(PPT$High_MedElShape_OutPRCP,1460)-HE_HL_Mean)/HE_HL_SD,
+     col=adjustcolor(Pal_1[4],alpha.f=.5),ylim=c(-3,.5),
+     ylab="Drought Index",xlab="Year",cex.axis=2.0,cex.lab=2.0,cex.main=2.0,type="l",lwd=3.0,
+     main="Four year SPI ")
+points(as.Date(PPT$Dates)[1460:6935],(roll_sum(PPT$High_LowElShape_OutPRCP,1460)-LE_HL_Mean)/LE_HL_SD,
+       col=adjustcolor(Pal_1[5],alpha.f=.5),type="l",lwd=3.0)
+#points(as.Date(together[,1]),cumsum(Delta_df$Low_MedElDelta-mean(Delta_df_sub$Low_MedElDelta))/19)
+points(as.Date(PPT$Dates)[1460:6935],(roll_sum(PPT$Low_LowElShape_OutPRCP,1460)-LE_LL_Mean)/LE_LL_SD,
+       col=adjustcolor(Pal_1[1],alpha.f=.5),type="l",lwd=3.0)
+points(as.Date(PPT$Dates)[1460:6935],(roll_sum(PPT$Low_MedElShape_OutPRCP,1460)-ME_LL_Mean)/ME_LL_SD,
+       col=adjustcolor(Pal_1[3],alpha.f=.5),type="l",lwd=3.0)
+
+#points(as.Date(together[,1]),cumsum(Delta_df$High_MedElDelta-mean(Delta_df_sub$High_MedElDelta))/19,col=Pal_1[4])
+
+abline(h=0)
+abline(v=as.Date("2013-06-15"),lty=2.0)
+abline(v=as.Date("2014-06-15"),lty=3.0)
+abline(v=as.Date("2015-06-15"),lty=4.0)
+abline(v=as.Date("2016-06-15"),lty=5.0)
+par(new = T)
+with(d=Merged, plot(as.Date(Merged$Dates),-Merged$LargePerc*100, 
+                       pch=16, axes=F, ylim=c(-50,0),xlab=NA, 
+                       ylab=NA, cex=2.0))
+  axis(side = 4,font.axis=2,font.lab=2,cex.lab=2.0,cex.axis=2.0)
+  mtext(side = 4, line = 3,cex=2.0, '-Percent Mortality')
+par(xpd = T)
+legend(as.Date("2019-09-01"),-20,legend=c("Low Elevation/Low Lat","High Elevation/Low Lat",
+                                              "Low Elevation/High Lat","High Elevation/High Lat",
+                                              "Beetle Mortality %","July of a given Year"),
+         pch=c(16,16,16,16,16,NA),lty=c(NA,NA,NA,NA,NA,1),col=c(Pal_1[1],Pal_1[3],Pal_1[4],Pal_1[5],"black","black"),
+         cex=2.0)
+
+
+
+PPT<-PPT_in[PPT_in$Dates %in% as.Date(Dates),]
+PPT<-PPT[PPT$Dates>"1999-01-01",]
+PPT<-PPT[order(PPT$Dates),]
+
+SPI_DF=data.frame(Dates=(as.Date(PPT$Dates)[1460:6935]),
+                  HE_HL=(roll_sum(PPT$High_MedElShape_OutPRCP,1460)-HE_HL_Mean)/HE_HL_SD,
+                  LE_HL=(roll_sum(PPT$High_LowElShape_OutPRCP,1460)-LE_HL_Mean)/LE_HL_SD,
+                  LE_LL=(roll_sum(PPT$Low_LowElShape_OutPRCP,1460)-LE_LL_Mean)/LE_LL_SD,
+                  HE_LL=(roll_sum(PPT$Low_MedElShape_OutPRCP,1460)-ME_LL_Mean)/ME_LL_SD
+                  )
+
+
+
+
+#write.csv(SPI_DF,"C:/Users/zacha/Documents/GitHub/IMAP_Python_Project/WPB_Model/WPB_Inputs/WPB_SPI.csv")
+```
+
+
+
+
+
+
+
+### Current Drought Index
+
+Normalize P-ET to th emean for the period between 2001-2010
+Rollling Cumulative Drought
+
+```{r pressure, fig.width=20.0,fig.height=10.0}
+Delta_Shorter<-Delta_df[Delta_df$Dates>"2008-07-01",]
+Merged<-merge(Delta_Shorter,Mortality,all.x=T,by="Dates")
+
+#jpeg(filename='C:/Users/zjrobbin/Documents/GitHub/IMAP_Python_Project/Written Documentation/Presentation/MPB_Drought.jpeg',quality=100)
+together<-cbind(as.character(Delta_Shorter$Dates),Delta_Shorter$Low_MedElDelta)
+
+
+par(mar=c(5,5,5,33),xpd=F)
+plot(as.Date(together[,1]),cumsum(Delta_Shorter$Low_LowElDelta-mean(Delta_df_sub$Low_LowElDelta)),
+     col=Pal_1[1],ylim=c(-1500,1000),
+     ylab="Drought Index",xlab="Year",cex.axis=2.0,cex.lab=2.0,cex.main=2.0,type="l",lwd=3.0,
+     main="Current Drought Index WPB Study Sites")
+#points(as.Date(together[,1]),cumsum(Delta_df$Low_MedElDelta-mean(Delta_df_sub$Low_MedElDelta))/19)
+points(as.Date(together[,1]),cumsum(Delta_Shorter$Low_HighElDelta-mean(Delta_df_sub$Low_HighElDelta)),
+       col=Pal_1[3],type="l",lwd=3.0)
+points(as.Date(together[,1]),cumsum(Delta_Shorter$High_LowElDelta-mean(Delta_df_sub$High_LowElDelta)),
+       col=Pal_1[4],type="l",lwd=3.0)
+#points(as.Date(together[,1]),cumsum(Delta_df$High_MedElDelta-mean(Delta_df_sub$High_MedElDelta))/19,col=Pal_1[4])
+points(as.Date(together[,1]),cumsum(Delta_Shorter$High_HighElDelta-mean(Delta_df_sub$High_HighElDelta)),
+       col=Pal_1[5],type="l",lwd=3.0)
+abline(h=0)
+
+abline(v=as.Date("2013-07-01"),lty=2.0)
+abline(v=as.Date("2014-07-01"),lty=3.0)
+abline(v=as.Date("2015-07-01"),lty=4.0)
+abline(v=as.Date("2016-07-01"),lty=5.0)
+par(new = T)
+with(d=Merged, plot(as.Date(Merged$Dates),-Merged$LargePerc*100, 
+                       pch=16, axes=F, ylim=c(-50,0.1),xlab=NA, 
+                       ylab=NA, cex=2.0))
+  axis(side = 4,font.axis=2,font.lab=2,cex.lab=2.0,cex.axis=2.0)
+  mtext(side = 4, line = 3,cex=2.0, '-Percent Mortality')
+par(xpd = T)
+legend(as.Date("2019-06-01"),-20,legend=c("Low Elevation/Low Lat","High Elevation/Low Lat",
+                                              "Low Elevation/High Lat","High Elevation/High Lat",
+                                              "Beetle Mortality %","July of a given Year"),
+         pch=c(16,16,16,16,16,NA),lty=c(NA,NA,NA,NA,NA,1),col=c(Pal_1[1],Pal_1[3],Pal_1[4],Pal_1[5],"black","black"),
+         cex=2.0)
+#?mtext()
+
+
+```
+
+#### Five Year Lag
+
+
+```{r, fig.width=20.0,fig.height=10.0}
+Delta_Shorter<-Delta_df[Delta_df$Dates>"2003-01-01",]
+Merged<-merge(Delta_Shorter,Mortality,all.x=T,by="Dates")
+Merged<-Merged[Merged$Dates>"2008-01-01",]
+#jpeg(filename='C:/Users/zjrobbin/Documents/GitHub/IMAP_Python_Project/Written Documentation/Presentation/MPB_Drought.jpeg',quality=100)
+together<-cbind(as.character(Delta_Shorter$Dates),Delta_Shorter$Low_MedElDelta)
+
+
+par(mar=c(5,5,5,33),xpd=F)
+plot(as.Date(together[1825:5475,1]),roll_sum((Delta_Shorter$Low_LowElDelta-mean(Delta_df_sub$Low_LowElDelta)),1825),
+     col=Pal_1[1],ylim=c(-1500,1000),
+     ylab="Drought Index",xlab="Year",cex.axis=2.0,cex.lab=2.0,cex.main=2.0,type="l",lwd=3.0,
+     main="Five Year Lag Index WPB Study Sites")
+#points(as.Date(together[,1]),cumsum(Delta_df$Low_MedElDelta-mean(Delta_df_sub$Low_MedElDelta))/19)
+points(as.Date(together[1825:5475,1]),roll_sum((Delta_Shorter$Low_HighElDelta-mean(Delta_df_sub$Low_HighElDelta)),1825),
+       col=Pal_1[3],type="l",lwd=3.0)
+points(as.Date(together[1825:5475,1]),roll_sum((Delta_Shorter$High_LowElDelta-mean(Delta_df_sub$High_LowElDelta)),1825),
+       col=Pal_1[4],type="l",lwd=3.0)
+#points(as.Date(together[,1]),cumsum(Delta_df$High_MedElDelta-mean(Delta_df_sub$High_MedElDelta))/19,col=Pal_1[4])
+points(as.Date(together[1825:5475,1]),roll_sum((Delta_Shorter$High_HighElDelta-mean(Delta_df_sub$High_HighElDelta)),1825),
+       col=Pal_1[5],type="l",lwd=3.0)
+abline(h=0)
+
+abline(v=as.Date("2013-07-01"),lty=2.0)
+abline(v=as.Date("2014-07-01"),lty=3.0)
+abline(v=as.Date("2015-07-01"),lty=4.0)
+abline(v=as.Date("2016-07-01"),lty=5.0)
+par(new = T)
+with(d=Merged, plot(as.Date(Merged$Dates),-Merged$LargePerc*100, 
+                       pch=16, axes=F, ylim=c(-50,0),xlab=NA, 
+                       ylab=NA, cex=2.0))
+  axis(side = 4,font.axis=2,font.lab=2,cex.lab=2.0,cex.axis=2.0)
+  mtext(side = 4, line = 3,cex=2.0, '-Percent Mortality')
+par(xpd = T)
+legend(as.Date("2019-09-01"),-30,legend=c("Low Elevation/Low Lat","High Elevation/Low Lat",
+                                              "Low Elevation/High Lat","High Elevation/High Lat",
+                                              "Beetle Mortality %","July of a given Year"),
+         pch=c(16,16,16,16,16,NA),lty=c(NA,NA,NA,NA,NA,1),col=c(Pal_1[1],Pal_1[3],Pal_1[4],Pal_1[5],"black","black"),
+         cex=2.0)
+```
+
+### Four Year Lag
+
+```{r, fig.width=20.0,fig.height=10.0}
+Delta_Shorter<-Delta_df[Delta_df$Dates>"2004-01-01",]
+Merged<-merge(Delta_Shorter,Mortality,all.x=T,by="Dates")
+Merged<-Merged[Merged$Dates>"2008-01-01",]
+#jpeg(filename='C:/Users/zjrobbin/Documents/GitHub/IMAP_Python_Project/Written Documentation/Presentation/MPB_Drought.jpeg',quality=100)
+together<-cbind(as.character(Delta_Shorter$Dates),Delta_Shorter$Low_MedElDelta)
+
+
+par(mar=c(5,5,5,33),xpd=F)
+plot(as.Date(together[1460:5110,1]),roll_sum((Delta_Shorter$Low_LowElDelta-mean(Delta_df_sub$Low_LowElDelta)),1460),
+     col=Pal_1[1],ylim=c(-1500,1000),
+     ylab="Drought Index",xlab="Year",cex.axis=2.0,cex.lab=2.0,cex.main=2.0,type="l",lwd=3.0,
+     main="Four Year Lag Index WPB Study Sites")
+#points(as.Date(together[,1]),cumsum(Delta_df$Low_MedElDelta-mean(Delta_df_sub$Low_MedElDelta))/19)
+points(as.Date(together[1460:5110,1]),roll_sum((Delta_Shorter$Low_HighElDelta-mean(Delta_df_sub$Low_HighElDelta)),1460),
+       col=Pal_1[3],type="l",lwd=3.0)
+points(as.Date(together[1460:5110,1]),roll_sum((Delta_Shorter$High_LowElDelta-mean(Delta_df_sub$High_LowElDelta)),1460),
+       col=Pal_1[4],type="l",lwd=3.0)
+#points(as.Date(together[,1]),cumsum(Delta_df$High_MedElDelta-mean(Delta_df_sub$High_MedElDelta))/19,col=Pal_1[4])
+points(as.Date(together[1460:5110,1]),roll_sum((Delta_Shorter$High_HighElDelta-mean(Delta_df_sub$High_HighElDelta)),1460),
+       col=Pal_1[5],type="l",lwd=3.0)
+abline(h=0)
+
+abline(v=as.Date("2013-07-01"),lty=2.0)
+abline(v=as.Date("2014-07-01"),lty=3.0)
+abline(v=as.Date("2015-07-01"),lty=4.0)
+abline(v=as.Date("2016-07-01"),lty=5.0)
+par(new = T)
+with(d=Merged, plot(as.Date(Merged$Dates),-Merged$LargePerc*100, 
+                       pch=16, axes=F, ylim=c(-50,0),xlab=NA, 
+                       ylab=NA, cex=2.0))
+  axis(side = 4,font.axis=2,font.lab=2,cex.lab=2.0,cex.axis=2.0)
+  mtext(side = 4, line = 3,cex=2.0, '-Percent Mortality')
+par(xpd = T)
+legend(as.Date("2019-09-01"),-20,legend=c("Low Elevation/Low Lat","High Elevation/Low Lat",
+                                              "Low Elevation/High Lat","High Elevation/High Lat",
+                                              "Beetle Mortality %","July of a given Year"),
+         pch=c(16,16,16,16,16,NA),lty=c(NA,NA,NA,NA,NA,1),col=c(Pal_1[1],Pal_1[3],Pal_1[4],Pal_1[5],"black","black"),
+         cex=2.0)
+```
+
+
+### Three Year Lag
+
+
+
+```{r, fig.width=20.0,fig.height=10.0}
+
+Delta_Shorter<-Delta_df[Delta_df$Dates>"2005-01-01",]
+Merged<-merge(Delta_Shorter,Mortality,all.x=T,by="Dates")
+Merged<-Merged[Merged$Dates>"2008-01-01",]
+#jpeg(filename='C:/Users/zjrobbin/Documents/GitHub/IMAP_Python_Project/Written Documentation/Presentation/MPB_Drought.jpeg',quality=100)
+together<-cbind(as.character(Delta_Shorter$Dates),Delta_Shorter$Low_MedElDelta)
+
+
+par(mar=c(5,5,5,33),xpd=F)
+plot(as.Date(together[1095:4745,1]),roll_sum((Delta_Shorter$Low_LowElDelta-mean(Delta_df_sub$Low_LowElDelta)),1095),
+     col=Pal_1[1],ylim=c(-1500,1000),
+     ylab="Drought Index",xlab="Year",cex.axis=2.0,cex.lab=2.0,cex.main=2.0,type="l",lwd=3.0,
+     main="Three Year Lag Index WPB Study Sites")
+#points(as.Date(together[,1]),cumsum(Delta_df$Low_MedElDelta-mean(Delta_df_sub$Low_MedElDelta))/19)
+points(as.Date(together[1095:4745,1]),roll_sum((Delta_Shorter$Low_HighElDelta-mean(Delta_df_sub$Low_HighElDelta)),1095),
+       col=Pal_1[3],type="l",lwd=3.0)
+points(as.Date(together[1095:4745,1]),roll_sum((Delta_Shorter$High_LowElDelta-mean(Delta_df_sub$High_LowElDelta)),1095),
+       col=Pal_1[4],type="l",lwd=3.0)
+#points(as.Date(together[,1]),cumsum(Delta_df$High_MedElDelta-mean(Delta_df_sub$High_MedElDelta))/19,col=Pal_1[4])
+points(as.Date(together[1095:4745,1]),roll_sum((Delta_Shorter$High_HighElDelta-mean(Delta_df_sub$High_HighElDelta)),1095),
+       col=Pal_1[5],type="l",lwd=3.0)
+abline(h=0)
+
+abline(v=as.Date("2013-07-01"),lty=2.0)
+abline(v=as.Date("2014-07-01"),lty=3.0)
+abline(v=as.Date("2015-07-01"),lty=4.0)
+abline(v=as.Date("2016-07-01"),lty=5.0)
+par(new = T)
+with(d=Merged, plot(as.Date(Merged$Dates),-Merged$LargePerc*100, 
+                       pch=16, axes=F, ylim=c(-50,0),xlab=NA, 
+                       ylab=NA, cex=2.0))
+  axis(side = 4,font.axis=2,font.lab=2,cex.lab=2.0,cex.axis=2.0)
+  mtext(side = 4, line = 3,cex=2.0, '-Percent Mortality')
+par(xpd = T)
+legend(as.Date("2019-09-01"),-20,legend=c("Low Elevation/Low Lat","High Elevation/Low Lat",
+                                              "Low Elevation/High Lat","High Elevation/High Lat",
+                                              "Beetle Mortality %","July of a given Year"),
+         pch=c(16,16,16,16,16,NA),lty=c(NA,NA,NA,NA,NA,1),col=c(Pal_1[1],Pal_1[3],Pal_1[4],Pal_1[5],"black","black"),
+         cex=2.0)
+```
+
+### Two Year Lag
+
+
+```{r, fig.width=20.0,fig.height=10.0}
+
+Delta_Shorter<-Delta_df[Delta_df$Dates>"2006-01-01",]
+Merged<-merge(Delta_Shorter,Mortality,all.x=T,by="Dates")
+Merged<-Merged[Merged$Dates>"2008-01-01",]
+#jpeg(filename='C:/Users/zjrobbin/Documents/GitHub/IMAP_Python_Project/Written Documentation/Presentation/MPB_Drought.jpeg',quality=100)
+together<-cbind(as.character(Delta_Shorter$Dates),Delta_Shorter$Low_MedElDelta)
+
+
+par(mar=c(5,5,5,33),xpd=F)
+plot(as.Date(together[730:4380,1]),roll_sum((Delta_Shorter$Low_LowElDelta-mean(Delta_df_sub$Low_LowElDelta)),730),
+     col=Pal_1[1],ylim=c(-1500,1000),
+     ylab="Drought Index",xlab="Year",cex.axis=2.0,cex.lab=2.0,cex.main=2.0,type="l",lwd=3.0,
+     main="Two Year Lag Index WPB Study Sites")
+#points(as.Date(together[,1]),cumsum(Delta_df$Low_MedElDelta-mean(Delta_df_sub$Low_MedElDelta))/19)
+points(as.Date(together[730:4380,1]),roll_sum((Delta_Shorter$Low_HighElDelta-mean(Delta_df_sub$Low_HighElDelta)),730),
+       col=Pal_1[3],type="l",lwd=3.0)
+points(as.Date(together[730:4380,1]),roll_sum((Delta_Shorter$High_LowElDelta-mean(Delta_df_sub$High_LowElDelta)),730),
+       col=Pal_1[4],type="l",lwd=3.0)
+#points(as.Date(together[,1]),cumsum(Delta_df$High_MedElDelta-mean(Delta_df_sub$High_MedElDelta))/19,col=Pal_1[4])
+points(as.Date(together[730:4380,1]),roll_sum((Delta_Shorter$High_HighElDelta-mean(Delta_df_sub$High_HighElDelta)),730),
+       col=Pal_1[5],type="l",lwd=3.0)
+abline(h=0)
+
+abline(v=as.Date("2013-07-01"),lty=2.0)
+abline(v=as.Date("2014-07-01"),lty=3.0)
+abline(v=as.Date("2015-07-01"),lty=4.0)
+abline(v=as.Date("2016-07-01"),lty=5.0)
+par(new = T)
+with(d=Merged, plot(as.Date(Merged$Dates),-Merged$LargePerc*100, 
+                       pch=16, axes=F, ylim=c(-50,0),xlab=NA, 
+                       ylab=NA, cex=2.0))
+  axis(side = 4,font.axis=2,font.lab=2,cex.lab=2.0,cex.axis=2.0)
+  mtext(side = 4, line = 3,cex=2.0, '-Percent Mortality')
+par(xpd = T)
+legend(as.Date("2019-09-01"),-20,legend=c("Low Elevation/Low Lat","High Elevation/Low Lat",
+                                              "Low Elevation/High Lat","High Elevation/High Lat",
+                                              "Beetle Mortality %","July of a given Year"),
+         pch=c(16,16,16,16,16,NA),lty=c(NA,NA,NA,NA,NA,1),col=c(Pal_1[1],Pal_1[3],Pal_1[4],Pal_1[5],"black","black"),
+         cex=2.0)
+```
+
+## One Year Lag
+
+```{r, fig.width=20.0,fig.height=10.0}
+
+Delta_Shorter<-Delta_df[Delta_df$Dates>"2007-01-01",]
+Merged<-merge(Delta_Shorter,Mortality,all.x=T,by="Dates")
+Merged<-Merged[Merged$Dates>"2008-01-01",]
+#jpeg(filename='C:/Users/zjrobbin/Documents/GitHub/IMAP_Python_Project/Written Documentation/Presentation/MPB_Drought.jpeg',quality=100)
+together<-cbind(as.character(Delta_Shorter$Dates),Delta_Shorter$Low_MedElDelta)
+
+
+par(mar=c(5,5,5,33),xpd=F)
+plot(as.Date(together[365:4015,1]),roll_sum((Delta_Shorter$Low_LowElDelta-mean(Delta_df_sub$Low_LowElDelta)),365),
+     col=Pal_1[1],ylim=c(-1500,1000),
+     ylab="Drought Index",xlab="Year",cex.axis=2.0,cex.lab=2.0,cex.main=2.0,type="l",lwd=3.0,
+     main="One Year Lag Index WPB Study Sites")
+#points(as.Date(together[,1]),cumsum(Delta_df$Low_MedElDelta-mean(Delta_df_sub$Low_MedElDelta))/19)
+points(as.Date(together[365:4015,1]),roll_sum((Delta_Shorter$Low_HighElDelta-mean(Delta_df_sub$Low_HighElDelta)),365),
+       col=Pal_1[3],type="l",lwd=3.0)
+points(as.Date(together[365:4015,1]),roll_sum((Delta_Shorter$High_LowElDelta-mean(Delta_df_sub$High_LowElDelta)),365),
+       col=Pal_1[4],type="l",lwd=3.0)
+#points(as.Date(together[,1]),cumsum(Delta_df$High_MedElDelta-mean(Delta_df_sub$High_MedElDelta))/19,col=Pal_1[4])
+points(as.Date(together[365:4015,1]),roll_sum((Delta_Shorter$High_HighElDelta-mean(Delta_df_sub$High_HighElDelta)),365),
+       col=Pal_1[5],type="l",lwd=3.0)
+abline(h=0)
+
+abline(v=as.Date("2013-07-01"),lty=2.0)
+abline(v=as.Date("2014-07-01"),lty=3.0)
+abline(v=as.Date("2015-07-01"),lty=4.0)
+abline(v=as.Date("2016-07-01"),lty=5.0)
+par(new = T)
+with(d=Merged, plot(as.Date(Merged$Dates),-Merged$LargePerc*100, 
+                       pch=16, axes=F, ylim=c(-50,0),xlab=NA, 
+                       ylab=NA, cex=2.0))
+  axis(side = 4,font.axis=2,font.lab=2,cex.lab=2.0,cex.axis=2.0)
+  mtext(side = 4, line = 3,cex=2.0, '-Percent Mortality')
+par(xpd = T)
+legend(as.Date("2019-09-01"),-20,legend=c("Low Elevation/Low Lat","High Elevation/Low Lat",
+                                              "Low Elevation/High Lat","High Elevation/High Lat",
+                                              "Beetle Mortality %","July of a given Year"),
+         pch=c(16,16,16,16,16,NA),lty=c(NA,NA,NA,NA,NA,1),col=c(Pal_1[1],Pal_1[3],Pal_1[4],Pal_1[5],"black","black"),
+         cex=2.0)
+```
+
+### Six Month Lag
+
+```{r, fig.width=20.0,fig.height=10.0}
+Delta_Shorter<-Delta_df[Delta_df$Dates>"2007-06-01",]
+Merged<-merge(Delta_Shorter,Mortality,all.x=T,by="Dates")
+Merged<-Merged[Merged$Dates>"2008-01-01",]
+#jpeg(filename='C:/Users/zjrobbin/Documents/GitHub/IMAP_Python_Project/Written Documentation/Presentation/MPB_Drought.jpeg',quality=100)
+together<-cbind(as.character(Delta_Shorter$Dates),Delta_Shorter$Low_MedElDelta)
+
+
+par(mar=c(5,5,5,33),xpd=F)
+plot(as.Date(together[183:3864,1]),roll_sum((Delta_Shorter$Low_LowElDelta-mean(Delta_df_sub$Low_LowElDelta)),183),
+     col=Pal_1[1],ylim=c(-1500,1000),
+     ylab="Drought Index",xlab="Year",cex.axis=2.0,cex.lab=2.0,cex.main=2.0,type="l",lwd=3.0,
+     main="Six Month Lag Index WPB Study Sites")
+#points(as.Date(together[,1]),cumsum(Delta_df$Low_MedElDelta-mean(Delta_df_sub$Low_MedElDelta))/19)
+points(as.Date(together[183:3864,1]),roll_sum((Delta_Shorter$Low_HighElDelta-mean(Delta_df_sub$Low_HighElDelta)),183),
+       col=Pal_1[3],type="l",lwd=3.0)
+points(as.Date(together[183:3864,1]),roll_sum((Delta_Shorter$High_LowElDelta-mean(Delta_df_sub$High_LowElDelta)),183),
+       col=Pal_1[4],type="l",lwd=3.0)
+#points(as.Date(together[,1]),cumsum(Delta_df$High_MedElDelta-mean(Delta_df_sub$High_MedElDelta))/19,col=Pal_1[4])
+points(as.Date(together[183:3864,1]),roll_sum((Delta_Shorter$High_HighElDelta-mean(Delta_df_sub$High_HighElDelta)),183),
+       col=Pal_1[5],type="l",lwd=3.0)
+abline(h=0)
+
+abline(v=as.Date("2013-07-01"),lty=2.0)
+abline(v=as.Date("2014-07-01"),lty=3.0)
+abline(v=as.Date("2015-07-01"),lty=4.0)
+abline(v=as.Date("2016-07-01"),lty=5.0)
+par(new = T)
+with(d=Merged, plot(as.Date(Merged$Dates),-Merged$LargePerc*100, 
+                       pch=16, axes=F, ylim=c(-50,0),xlab=NA, 
+                       ylab=NA, cex=2.0))
+  axis(side = 4,font.axis=2,font.lab=2,cex.lab=2.0,cex.axis=2.0)
+  mtext(side = 4, line = 3,cex=2.0, '-Percent Mortality')
+par(xpd = T)
+legend(as.Date("2019-09-01"),-20,legend=c("Low Elevation/Low Lat","High Elevation/Low Lat",
+                                              "Low Elevation/High Lat","High Elevation/High Lat",
+                                              "Beetle Mortality %","July of a given Year"),
+         pch=c(16,16,16,16,16,NA),lty=c(NA,NA,NA,NA,NA,1),col=c(Pal_1[1],Pal_1[3],Pal_1[4],Pal_1[5],"black","black"),
+         cex=2.0)
+```
+
+
+### Daily
+
+```{r, fig.width=20.0,fig.height=10.0}
+library(grDevices)
+Delta_Shorter<-Delta_df[Delta_df$Dates>"2008-01-01",]
+Merged<-merge(Delta_Shorter,Mortality,all.x=T,by="Dates")
+Merged<-Merged[Merged$Dates>"2008-01-01",]
+#jpeg(filename='C:/Users/zjrobbin/Documents/GitHub/IMAP_Python_Project/Written Documentation/Presentation/MPB_Drought.jpeg',quality=100)
+together<-cbind(as.character(Delta_Shorter$Dates),Delta_Shorter$Low_MedElDelta)
+
+
+par(mar=c(5,5,5,33),xpd=F)
+plot(as.Date(together[1:3650,1]),roll_sum((Delta_Shorter$Low_LowElDelta-mean(Delta_df_sub$Low_LowElDelta)),1),
+     col=adjustcolor(Pal_1[1],alpha.f=.5),ylim=c(-50,100),
+     ylab="Drought Index",xlab="Year",cex.axis=2.0,cex.lab=2.0,cex.main=2.0,type="l",lwd=3.0,
+     main="Single day Index WPB Study Sites")
+#points(as.Date(together[,1]),cumsum(Delta_df$Low_MedElDelta-mean(Delta_df_sub$Low_MedElDelta))/19)
+points(as.Date(together[1:3650,1]),roll_sum((Delta_Shorter$Low_HighElDelta-mean(Delta_df_sub$Low_HighElDelta)),1),
+       col=adjustcolor(Pal_1[3],alpha.f=.5),type="l",lwd=3.0)
+points(as.Date(together[1:3650,1]),roll_sum((Delta_Shorter$High_LowElDelta-mean(Delta_df_sub$High_LowElDelta)),1),
+       col=adjustcolor(Pal_1[4],alpha.f=.5),type="l",lwd=3.0)
+#points(as.Date(together[,1]),cumsum(Delta_df$High_MedElDelta-mean(Delta_df_sub$High_MedElDelta))/19,col=Pal_1[4])
+points(as.Date(together[1:3650,1]),roll_sum((Delta_Shorter$High_HighElDelta-mean(Delta_df_sub$High_HighElDelta)),1),
+       col=adjustcolor(Pal_1[5],alpha.f=.5),type="l",lwd=3.0)
+abline(h=0)
+
+abline(v=as.Date("2013-07-01"),lty=2.0)
+abline(v=as.Date("2014-07-01"),lty=3.0)
+abline(v=as.Date("2015-07-01"),lty=4.0)
+abline(v=as.Date("2016-07-01"),lty=5.0)
+par(new = T)
+with(d=Merged, plot(as.Date(Merged$Dates),-Merged$LargePerc*100, 
+                       pch=16, axes=F, ylim=c(-50,0),xlab=NA, 
+                       ylab=NA, cex=2.0))
+  axis(side = 4,font.axis=2,font.lab=2,cex.lab=2.0,cex.axis=2.0)
+  mtext(side = 4, line = 3,cex=2.0, '-Percent Mortality')
+par(xpd = T)
+legend(as.Date("2019-09-01"),-20,legend=c("Low Elevation/Low Lat","High Elevation/Low Lat",
+                                              "Low Elevation/High Lat","High Elevation/High Lat",
+                                              "Beetle Mortality %","July of a given Year"),
+         pch=c(16,16,16,16,16,NA),lty=c(NA,NA,NA,NA,NA,1),col=c(Pal_1[1],Pal_1[3],Pal_1[4],Pal_1[5],"black","black"),
+         cex=2.0)
+```
+
+
