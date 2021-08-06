@@ -1,7 +1,7 @@
 # IMAP_TDIA_Warming
 
 
-![Warming increases](/readmefile/Fig3.jpg)
+![Warming increases](/readmefile/Fig3.png)
 
 
 
