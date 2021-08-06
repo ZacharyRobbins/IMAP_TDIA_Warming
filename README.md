@@ -7,4 +7,4 @@ This is the erespository for the Western Pine Beetle IMAP_TDIA work, used in the
 *
 
 
-![Workflow](/readmefile/IMAP_Workflow.png)
+![Workflow](/readmefile/IMAP_Workflow.jpg)
