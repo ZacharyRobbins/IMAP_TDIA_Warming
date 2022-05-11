@@ -1,6 +1,8 @@
 # IMAP_TDIA_Warming
 
+# Please now redirect to the permenant home at:
 
+https://github.com/lanl/IMAP-TDIA_CodeBase
 
 
 This is the respository for the Western Pine Beetle IMAP_TDIA work, used in the publicaiton of 
